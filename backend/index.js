@@ -1,14 +1,21 @@
-import express from "express"
-import cors from "cors"
+import "./src/bugle.js"
+
 import Auth from "./src/auth.js"
 import State from "./src/state.js";
-import "./src/observer.js"
+import History from "./src/history.js";
+import Observer from "./src/observer.js"
+
+import express from "express"
+import cors from "cors"
+
+import * as dotenv from "dotenv"
+dotenv.config();
+
+const PORT = process.env.PORT || 8888;
 
 const app = express();
 app.use( cors() );
 app.use( "/", Auth.router );
-
-await State.load();
 
 
 app.get( "/user", async ( req, res ) => {
@@ -50,6 +57,14 @@ app.get( "/fetch/playlists", async ( req, res ) => {
 });
 
 
-app.listen( 8888, () => {
-    console.log( "listening on 8888 ..." );
+app.listen( 8888, async () => {
+
+    console.log( "listening on", PORT, "..." );
+
+    await Auth.init();
+    await State.load();
+    await History.load();
+
+    Observer.start();
+
 });

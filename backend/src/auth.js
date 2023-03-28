@@ -1,24 +1,17 @@
 import { Router } from "express";
-import * as dotenv from "dotenv"
 import fs from "fs/promises"
 import { existsSync } from "fs";
 
+import * as dotenv from "dotenv"
 dotenv.config();
+
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const AUTH_FILE = "db/auth.json";
 const REDIRECT_URI = "http://localhost:8888/callback";
 
 const router = Router();
-
-let tokens = {
-    access_token: 'BQCVryP8_8ZqYwivdNXZFZhIrQ44ez1bTGb1-nIUBW7NKRLWydByLN9HfUIJDD43owZcoJjaDbdbJjGOj6w_QaPFqtzPhG1oO60iMd-gkvjXi7kDaFVPSP1P5ppVZ2TXomickJ4yuPa8-07WDy8t1xE0OuLVZw30Im-T6qZwMqQOHmMGD_56ZM0yY0LsrixabirJm946n6095_fAH-VtuVycn85HFdGD3QiSx4SmrpoLvmD2lTFIjPKzsqG9Da3sNurDyEDcrPIR-v0SQMw',
-    token_type: 'Bearer',
-    expires_in: 3600,
-    created_at: 1679962731152,
-    refresh_token: 'AQCvNP4ZZ4ukDhzdo3AAkVF8NB4XhczeuZKBKuACPOZ3S_mtfPz9YpX8_Fcu4yCPyht_abU3pUtInowXFwHG_uEUTaM6aEULmty4QTs9ZXJaXnC-fVd90-FySz6VucuYuhc',
-    scope: 'playlist-read-private user-library-read playlist-modify-private playlist-modify-public user-read-email user-read-private'
-};
+let tokens = {};
 
 const SCOPE = [
     "user-read-private",
@@ -36,21 +29,31 @@ async function updateTokens( newTokens ) {
     tokens = Object.assign( {}, tokens, newTokens );
     tokens.created_at = Date.now();
     fs.writeFile( AUTH_FILE, JSON.stringify( tokens, null, 2 ) );
-    console.log( tokens );
+    console.log( "token expires at", new Date( tokens.created_at ).toISOString() );
 }
 
 
 async function restoreTokens() {
+
     console.log( "loading auth tokens ..." );
+
     if ( ! existsSync( AUTH_FILE ) ) return;
     tokens = JSON.parse( await fs.readFile( AUTH_FILE ) );
     console.log( tokens );
+
+    if ( isExpired( tokens ) ) {
+        console.warn( "token expired" );
+        await fetch( "http://localhost:8888/refresh" );
+    }
+
 }
 
+function isExpired( tokens ) {
+    return new Date( tokens.created_at + ( tokens.expires_in - 10 ) * 1000 ) < Date.now();
+}
 
 async function authorizationHeader() {
-    const tokenExpired = new Date( tokens.created_at + ( tokens.expires_in - 10 ) * 1000 ) < Date.now();
-    if ( tokenExpired ) await fetch( "http://localhost:8888/refresh" );
+    if ( isExpired( tokens ) ) await fetch( "http://localhost:8888/refresh" );
     return { "Authorization": tokens.token_type + " " + tokens.access_token };
 }
 
@@ -141,13 +144,11 @@ router.get( "/refresh", async ( req, res ) => {
 });
 
 
-await restoreTokens();
-
-
 const Auth = {
     router,
     tokens,
-    getHeader: authorizationHeader
+    getHeader: authorizationHeader,
+    init: restoreTokens
 };
 
 export default Auth;

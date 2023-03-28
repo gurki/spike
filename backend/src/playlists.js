@@ -7,8 +7,14 @@ async function addTrack( trackUri, playlistId ) {
 
     const playlistUrl = "https://api.spotify.com/v1/playlists/" + playlistId + "/tracks";
     const headers = await Auth.getHeader();
-    const uriData = await fetch( playlistUrl + "?fields=items.track.uri", { headers } );
-    const uriJson = await uriData.json()
+    const data = await fetch( playlistUrl + "?fields=items.track.uri", { headers } );
+
+    if ( data.status !== 200 ) {
+        console.error( data.statusText );
+        return;
+    }
+
+    const uriJson = await data.json()
     const uris = uriJson.items.map( item => item.track.uri );
 
     if ( uris.includes( trackUri ) ) {

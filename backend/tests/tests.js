@@ -1,4 +1,4 @@
-import Auth from "./auth.js";
+import Auth from "../src/auth.js";
 
 
 async function addTrackToPlaylist( trackUri, playlistId ) {

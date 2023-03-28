@@ -1,6 +1,7 @@
 import Auth from "./auth.js"
 import State from "./state.js";
 import Playlists from "./playlists.js";
+import History from "./history.js";
 
 
 async function updateLiked() {
@@ -9,6 +10,12 @@ async function updateLiked() {
 
     const headers = await Auth.getHeader();
     const data = await fetch( "https://api.spotify.com/v1/me/tracks?limit=20", { headers } );
+
+    if ( data.status !== 200 ) {
+        console.error( data.statusText );
+        return;
+    }
+
     const recent = await data.json();
     const trackUris = new Set( State.state.liked.map( item => item.track.uri ) );
     const newLiked = recent.items.filter( item => ! trackUris.has( item.track.uri ) );
@@ -49,5 +56,20 @@ function handleNewLiked( newLiked ) {
 
 }
 
-setInterval( updateLiked, 60 * 1000 );
-console.log( "keeping an eye out for new likes ..." );
+
+function start() {
+
+    setInterval( updateLiked, 1 * 60 * 1000 );
+    console.log( "watching out for new likes ..." );
+
+    setInterval( History.fetchRecent, 1 * 60 * 1000 )
+    console.log( "tracking history ..." );
+
+}
+
+
+const Observer = {
+    start
+};
+
+export default Observer;

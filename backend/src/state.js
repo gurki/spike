@@ -104,8 +104,7 @@ async function addLiked( newLiked ) {
 
 
 async function load() {
-    loadPlaylists();
-    loadLiked();
+    await Promise.all( [ loadPlaylists(), loadLiked() ] );
 }
 
 
