@@ -25,11 +25,15 @@ const SCOPE = [
 
 
 async function updateTokens( newTokens ) {
+
     console.log( "updating auth tokens ..." );
+
     tokens = Object.assign( {}, tokens, newTokens );
     tokens.created_at = Date.now();
     fs.writeFile( AUTH_FILE, JSON.stringify( tokens, null, 2 ) );
-    console.log( "token expires at", new Date( tokens.created_at ).toISOString() );
+
+    console.log( "new token expires at", new Date( tokens.created_at ).toISOString() );
+
 }
 
 
@@ -39,7 +43,6 @@ async function restoreTokens() {
 
     if ( ! existsSync( AUTH_FILE ) ) return;
     tokens = JSON.parse( await fs.readFile( AUTH_FILE ) );
-    console.log( tokens );
 
     if ( isExpired( tokens ) ) {
         console.warn( "token expired" );
