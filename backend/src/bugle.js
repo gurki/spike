@@ -162,7 +162,7 @@ const icons = {
 };
 
 
-const safeIcons = {
+export const safeIcons = {
     success: "✔️",
     failure: "❌",
     started: "⏳",

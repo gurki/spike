@@ -1,7 +1,8 @@
 import Auth from "./auth.js"
-import State from "./state.js";
+import Liked from "./liked.js";
 import Playlists from "./playlists.js";
 import History from "./history.js";
+import { safeIcons } from "./bugle.js";
 
 
 async function updateLiked() {
@@ -17,19 +18,14 @@ async function updateLiked() {
     }
 
     const recent = await data.json();
-    const trackUris = new Set( State.state.liked.map( item => item.track.uri ) );
+    const trackUris = new Set( Liked.liked.map( item => item.track.uri ) );
     const newLiked = recent.items.filter( item => ! trackUris.has( item.track.uri ) );
 
     if ( newLiked.length === 0 ) return;
 
-    console.log( "found", newLiked.length, "new liked track(s)" );
+    console.log( safeIcons.love, "found", newLiked.length, "new liked track(s)" );
     handleNewLiked( newLiked );
 
-}
-
-
-function playlistForMonth( date ) {
-    return State.state.playlists.find( playlist => playlist.name === date );
 }
 
 
@@ -39,7 +35,7 @@ function handleNewLiked( newLiked ) {
 
         const month = item.added_at.substring( 0, 7 );
         const trackUri = item.track.uri;
-        const playlist = playlistForMonth( month );
+        const playlist = Playlists.find( month );
         let playlistId;
 
         if ( ! playlist ) {
@@ -52,7 +48,7 @@ function handleNewLiked( newLiked ) {
 
     }
 
-    State.addLiked( newLiked );
+    Liked.addTracks( newLiked );
 
 }
 
@@ -60,10 +56,13 @@ function handleNewLiked( newLiked ) {
 function start() {
 
     setInterval( updateLiked, 1 * 60 * 1000 );
-    console.log( "watching out for new likes ..." );
+    console.log( safeIcons.started, "watching out for new likes ..." );
 
-    setInterval( History.fetchRecent, 1 * 60 * 1000 )
-    console.log( "tracking history ..." );
+    setInterval( History.fetch, 1 * 60 * 1000 )
+    console.log( safeIcons.started, "tracking history ..." );
+
+    updateLiked();
+    History.fetch();
 
 }
 

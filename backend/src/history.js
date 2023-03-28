@@ -1,6 +1,7 @@
 import fs from "fs/promises"
 import { existsSync } from "fs";
 import Auth from "./auth.js";
+import { safeIcons } from "./bugle.js";
 
 const HISTORY_FILE = "db/history.csv";
 
@@ -8,7 +9,7 @@ let history = [];
 let timestamps = new Set();
 
 
-async function loadHistory() {
+async function load() {
 
     if ( ! existsSync( HISTORY_FILE ) ) {
         console.error( "couldn't find", HISTORY_FILE );
@@ -24,15 +25,17 @@ async function loadHistory() {
 
     history = buffer.toString().split( "\n" );
     history.forEach( line => timestamps.add( line.split( ',', 1 )[ 0 ] ) );
+    History.history = history;
+    History.timestamps = timestamps;
 
-    console.log( "read", history.length, "tracks" );
+    console.log( safeIcons.success, "read", history.length, "tracks" );
 
 }
 
 
-async function fetchRecent() {
+async function fetchHistory() {
 
-    console.log( "fetching recent ..." );
+    console.log( "fetching history ..." );
 
     const headers = await Auth.getHeader();
     const data = await fetch( "https://api.spotify.com/v1/me/player/recently-played?limit=20", { headers } );
@@ -60,7 +63,10 @@ async function fetchRecent() {
     newTracks.forEach( item => timestamps.add( item.played_at ) );
     fs.appendFile( HISTORY_FILE, "\n" + values.join( "\n" ) );
 
-    console.log( "found", newTracks.length, "new tracks" );
+    History.history = history;
+    History.timestamps = timestamps;
+
+    console.log( safeIcons.love, "found", newTracks.length, "new tracks" );
 
 }
 
@@ -68,8 +74,8 @@ async function fetchRecent() {
 const History = {
     history,
     timestamps,
-    load: loadHistory,
-    fetchRecent
+    load,
+    fetch: fetchHistory
 };
 
 export default History;

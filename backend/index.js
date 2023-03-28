@@ -1,7 +1,9 @@
 import "./src/bugle.js"
+import { safeIcons } from "./src/bugle.js";
 
 import Auth from "./src/auth.js"
-import State from "./src/state.js";
+import Liked from "./src/liked.js";
+import Playlists from "./src/playlists.js";
 import History from "./src/history.js";
 import Observer from "./src/observer.js"
 
@@ -30,39 +32,40 @@ app.get( "/user", async ( req, res ) => {
 
 
 app.get( "/playlists", async ( req, res ) => {
-    const names = State.state.playlists.map( p => p.name );
+    const names = Playlists.playlists.map( p => p.name );
     res.send( names );
 });
 
 
 app.get( "/liked", async ( req, res ) => {
-    res.send( State.state.liked.length.toFixed() + " liked songs" );
+    res.send( Liked.liked.length.toFixed() + " liked songs" );
 });
 
 
 app.get( "/monthlies", async ( req, res ) => {
-    res.send( Object.keys( State.monthlies() ) );
+    res.send( Object.keys( Playlists.monthlies ) );
 });
 
 
 app.get( "/fetch/liked", async ( req, res ) => {
-    State.fetchLiked();
+    Liked.fetch();
     res.sendStatus( 202 );
 });
 
 
 app.get( "/fetch/playlists", async ( req, res ) => {
-    State.fetchPlaylists();
+    Playlists.fetch();
     res.sendStatus( 202 );
 });
 
 
 app.listen( 8888, async () => {
 
-    console.log( "listening on", PORT, "..." );
+    console.log( safeIcons.started, "listening on", PORT, "..." );
 
     await Auth.init();
-    await State.load();
+    await Liked.load();
+    await Playlists.load();
     await History.load();
 
     Observer.start();
