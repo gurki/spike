@@ -5,6 +5,8 @@ a spotify **watchdog** and **database** for **likes ❤️** and track **history
 create `.env` file in `/backend`, add your [spotify api tokens](https://developer.spotify.com/documentation/web-api) and define settings.
 
 ```env
+PORT=8888
+
 CLIENT_ID="YOUR_SPOTIFY_CLIENT_ID"
 CLIENT_SECRET="YOUR_SPOTIFY_CLIENT_SECRET"
 
@@ -26,6 +28,10 @@ yarn
 yarn dev
 ```
 
+using pm2.
+```sh
+pm2 start index.js --name "spike"
+```
 
 ## Overview
 everything is stored **locally**.

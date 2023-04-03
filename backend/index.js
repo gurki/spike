@@ -62,7 +62,7 @@ app.get( "/fetch/playlists", async ( req, res ) => {
 
 app.listen( PORT, async () => {
 
-    console.log( safeIcons.started, "listening on", PORT, "..." );
+    console.log( safeIcons.started, "spike 🦔 listening on", PORT, "..." );
 
     await Auth.init();
 
