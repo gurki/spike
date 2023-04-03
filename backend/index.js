@@ -14,7 +14,7 @@ import * as dotenv from "dotenv"
 dotenv.config();
 
 const PORT = process.env.PORT || 8888;
-const STARTUP_FETCH_ALL = ( process.env.STARTUP_FETCH_ALL === "True" );
+const STARTUP_FETCH_ALL = process.env.STARTUP_FETCH_ALL || false;
 
 const app = express();
 app.use( cors() );

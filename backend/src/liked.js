@@ -57,9 +57,9 @@ async function fetchLiked() {
 
 async function addTracks( tracks ) {
     if ( ! tracks || tracks.length === 0 ) return;
-    console.log( "add liked", tracks.length, "..." );
     liked.splice( 0, 0, ...tracks );
     fs.writeFile( LIKED_FILE, JSON.stringify( liked ) );
+    console.log( "added", tracks.length, "liked ..." );
 }
 
 

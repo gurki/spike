@@ -13,6 +13,9 @@ HISTORY_INTERVAL_S=60
 
 LIKES_LIMIT=10
 HISTORY_LIMIT=10
+
+# refetch all of `liked.json` and `playlists.json` on start
+STARTUP_FETCH_ALL=true
 ```
 
 install and run.
@@ -48,4 +51,7 @@ newly discovered **recently played tracks** are automatically appended to the **
 
 
 ## Endpoints
-visit `/login` to connect to spotify.
+- `/login` - connect to spotify
+- `/user` - current user info
+- `/fetch/liked` - query and replace all saved tracks (`liked.json`)
+- `/fetch/playlists` - query and replace all playlists (`playlists.json`)
