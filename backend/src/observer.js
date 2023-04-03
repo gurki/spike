@@ -4,13 +4,21 @@ import Playlists from "./playlists.js";
 import History from "./history.js";
 import { safeIcons } from "./bugle.js";
 
+import * as dotenv from "dotenv"
+dotenv.config();
+
+const LIKES_INTERVAL_S = Number( process.env.LIKES_INTERVAL_S ) || 60;
+const HISTORY_INTERVAL_S = Number( process.env.HISTORY_INTERVAL_S ) || 60;
+const LIKES_LIMIT = Number( process.env.LIKES_LIMIT ) || 10;
+
+console.log( LIKES_INTERVAL_S, HISTORY_INTERVAL_S, LIKES_LIMIT );
 
 async function updateLiked() {
 
     console.log( "updating liked ..." );
 
     const headers = await Auth.getHeader();
-    const data = await fetch( "https://api.spotify.com/v1/me/tracks?limit=20", { headers } );
+    const data = await fetch( `https://api.spotify.com/v1/me/tracks?limit=${LIKES_LIMIT}`, { headers } );
 
     if ( data.status !== 200 ) {
         console.error( data.statusText );
@@ -56,10 +64,10 @@ function handleNewLiked( newLiked ) {
 
 function start() {
 
-    setInterval( updateLiked, 1 * 60 * 1000 );
+    setInterval( updateLiked, LIKES_INTERVAL_S * 1000 );
     console.log( safeIcons.started, "watching out for new likes ..." );
 
-    setInterval( History.fetch, 1 * 60 * 1000 )
+    setInterval( History.fetch, HISTORY_INTERVAL_S * 1000 )
     console.log( safeIcons.started, "tracking history ..." );
 
     updateLiked();

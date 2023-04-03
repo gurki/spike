@@ -3,6 +3,10 @@ import { existsSync } from "fs";
 import Auth from "./auth.js";
 import { safeIcons } from "./bugle.js";
 
+import * as dotenv from "dotenv"
+dotenv.config();
+
+const HISTORY_LIMIT = Number( process.env.HISTORY_LIMIT ) || 10;
 const HISTORY_FILE = "db/history.csv";
 
 let history = [];
@@ -38,7 +42,7 @@ async function fetchHistory() {
     console.log( "fetching history ..." );
 
     const headers = await Auth.getHeader();
-    const data = await fetch( "https://api.spotify.com/v1/me/player/recently-played?limit=20", { headers } );
+    const data = await fetch( `https://api.spotify.com/v1/me/player/recently-played?limit=${HISTORY_LIMIT}`, { headers } );
 
     if ( data.status !== 200 ) {
         console.error( data.statusText );

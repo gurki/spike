@@ -7,8 +7,10 @@ dotenv.config();
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const PORT = Number( process.env.PORT ) || 8888;
 const AUTH_FILE = "db/auth.json";
-const REDIRECT_URI = "http://localhost:8888/callback";
+const LOCAL_URL = "http://localhost:" + PORT;
+const REDIRECT_URL = LOCAL_URL + "/callback";
 
 const router = Router();
 let tokens = {};
@@ -46,7 +48,7 @@ async function restoreTokens() {
 
     if ( isExpired( tokens ) ) {
         console.warn( "token expired" );
-        await fetch( "http://localhost:8888/refresh" );
+        await fetch( `http://localhost:${PORT}/refresh` );
     }
 
 }
@@ -80,7 +82,7 @@ router.get( "/login", ( req, res ) => {
         response_type: "code",
         client_id: CLIENT_ID,
         scope: SCOPE,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: REDIRECT_URL,
         state: state
     });
 

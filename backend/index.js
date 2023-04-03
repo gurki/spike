@@ -59,7 +59,7 @@ app.get( "/fetch/playlists", async ( req, res ) => {
 });
 
 
-app.listen( 8888, async () => {
+app.listen( PORT, async () => {
 
     console.log( safeIcons.started, "listening on", PORT, "..." );
 
