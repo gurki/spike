@@ -24,7 +24,7 @@ yarn dev
 ```
 
 
-## Usage
+## Overview
 everything is stored **locally**.
 the database lives as **files** in `/backend/db`.
 
@@ -33,8 +33,7 @@ the database lives as **files** in `/backend/db`.
 - `playlists.json`: list of all [playlists](https://developer.spotify.com/documentation/web-api/reference/get-playlist)
 - `history.csv`: history of [tracks](https://developer.spotify.com/documentation/web-api/reference/get-recently-played) since start
 
-### History
-the **history** is saved as follows.
+the **history** is saved in the following csv format.
 
 ```csv
 startedAt,trackUri,contextUri
@@ -43,7 +42,7 @@ startedAt,trackUri,contextUri
 ### Observer
 the **observer** runs queries every `*_INTERVAL_S` seconds. it fetches the last `*_LIMIT` entries.
 
-newly discovered **saved tracks** are automatically added to the according monthly playlist `YYYY-mm`, based on their `added_at` field. if the playlist doesn't exist, it creates it first.
+newly discovered **saved tracks** are automatically added to the according monthly playlist `YYYY-mm`, based on their `added_at` field. if the playlist doesn't exist, it will be created first.
 
 newly discovered **recently played tracks** are automatically appended to the **history**.
 
