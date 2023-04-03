@@ -11,7 +11,6 @@ const LIKES_INTERVAL_S = Number( process.env.LIKES_INTERVAL_S ) || 60;
 const HISTORY_INTERVAL_S = Number( process.env.HISTORY_INTERVAL_S ) || 60;
 const LIKES_LIMIT = Number( process.env.LIKES_LIMIT ) || 10;
 
-console.log( LIKES_INTERVAL_S, HISTORY_INTERVAL_S, LIKES_LIMIT );
 
 async function updateLiked() {
 
@@ -37,7 +36,7 @@ async function updateLiked() {
 }
 
 
-function handleNewLiked( newLiked ) {
+async function handleNewLiked( newLiked ) {
 
     for ( const item of newLiked ) {
 
@@ -48,7 +47,7 @@ function handleNewLiked( newLiked ) {
 
         if ( ! playlist ) {
             console.log( "playlist", month, "doesn't exist yet" );
-            const newPlaylist = Playlists.create( month );
+            const newPlaylist = await Playlists.create( month );
             playlistId = newPlaylist.id;
         }
 

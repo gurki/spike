@@ -1,10 +1,10 @@
 import "./src/bugle.js"
-import { safeIcons } from "./src/bugle.js";
+import { safeIcons } from "./src/bugle.js"
 
 import Auth from "./src/auth.js"
-import Liked from "./src/liked.js";
-import Playlists from "./src/playlists.js";
-import History from "./src/history.js";
+import Liked from "./src/liked.js"
+import Playlists from "./src/playlists.js"
+import History from "./src/history.js"
 import Observer from "./src/observer.js"
 
 import express from "express"
@@ -14,6 +14,7 @@ import * as dotenv from "dotenv"
 dotenv.config();
 
 const PORT = process.env.PORT || 8888;
+const STARTUP_FETCH_ALL = ( process.env.STARTUP_FETCH_ALL === "True" );
 
 const app = express();
 app.use( cors() );
@@ -64,8 +65,15 @@ app.listen( PORT, async () => {
     console.log( safeIcons.started, "listening on", PORT, "..." );
 
     await Auth.init();
-    await Liked.load();
-    await Playlists.load();
+
+    if ( STARTUP_FETCH_ALL ) {
+        await Liked.fetch();
+        await Playlists.fetch();
+    } else {
+        await Liked.load();
+        await Playlists.load();
+    }
+
     await History.load();
 
     Observer.start();

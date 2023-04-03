@@ -113,7 +113,10 @@ async function addTrack( trackUri, playlistId ) {
         body: JSON.stringify({ uris: [ trackUri ] })
     });
 
-    console.log( postData.status, postData.statusText );
+    if ( postData.status != 201 ) {
+        console.error( safeIcons.failure, "couldn't add track" );
+        console.error( postData.status, postData.statusText );
+    }
 
 }
 
