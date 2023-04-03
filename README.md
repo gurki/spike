@@ -1,5 +1,5 @@
 # spike 🦔
-a spotify **watchdog** and **database** for **likes❤️** and track **history⏳**.
+a spotify **watchdog** and **database** for **likes ❤️** and track **history ⏳**.
 
 ## Setup
 create `.env` file in `/backend`, add your [spotify api tokens](https://developer.spotify.com/documentation/web-api) and define settings.
