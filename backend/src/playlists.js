@@ -31,6 +31,38 @@ async function load() {
 }
 
 
+async function createPlaylist( name ) {
+
+    console.log( "creating playlist", name ,"..." );
+
+    const headers = await Auth.getHeader();
+    const data = {
+        name,
+        public: false
+    };
+
+    const res = await fetch( "https://api.spotify.com/v1/me/playlists?limit=50", {
+        method: "POST",
+        headers,
+        body: JSON.stringify( data )
+    });
+
+    if ( res.status != 201 ) {
+        console.error( res.status, res.statusText );
+        return undefined;
+    }
+
+    const playlist = await res.json();
+
+    playlists.push( playlist );
+    fs.writeFile( PLAYLISTS_FILE, JSON.stringify( playlists ) );
+    didUpdate();
+
+    return playlist;
+
+}
+
+
 async function fetchPlaylists() {
 
     console.log( "fetching playlists ..." );
@@ -110,7 +142,8 @@ const Playlists = {
     load,
     fetch: fetchPlaylists,
     find,
-    addTrack
+    addTrack,
+    create: createPlaylist
 };
 
 export default Playlists;

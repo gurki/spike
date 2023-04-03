@@ -39,8 +39,9 @@ function handleNewLiked( newLiked ) {
         let playlistId;
 
         if ( ! playlist ) {
-            console.error( "playlist", month, "doesn't exist yet" );
-            continue;
+            console.log( "playlist", month, "doesn't exist yet" );
+            const newPlaylist = Playlists.create( month );
+            playlistId = newPlaylist.id;
         }
 
         playlistId = playlist.id;
