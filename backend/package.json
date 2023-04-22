@@ -4,8 +4,10 @@
   "main": "index.js",
   "license": "MIT",
   "type": "module",
+  "main": "index.js",
   "scripts": {
-    "dev": "nodemon index.js --ignore ./db/"
+    "dev": "nodemon index.js --ignore ./db/",
+    "start": "node index.js"
   },
   "dependencies": {
     "chalk": "^5.2.0",
