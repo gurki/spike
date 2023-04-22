@@ -1,6 +1,6 @@
 {
-  "name": "spotifire",
-  "version": "1.0.0",
+  "name": "spike",
+  "version": "23w14-dev",
   "main": "index.js",
   "license": "MIT",
   "type": "module",
