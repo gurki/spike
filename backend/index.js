@@ -64,7 +64,12 @@ app.listen( PORT, async () => {
 
     console.log( safeIcons.started, "spike 🦔 listening on", PORT, "..." );
 
-    await Auth.init();
+    const authenticated = await Auth.init();
+
+    if ( !authenticated ) {
+        console.error( safeIcons.failure, `authentication failed. did you call http://localhost:${PORT}/login already?` );
+        return;
+    }
 
     if ( STARTUP_FETCH_ALL ) {
         await Liked.fetch();

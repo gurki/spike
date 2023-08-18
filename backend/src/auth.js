@@ -43,7 +43,7 @@ async function restoreTokens() {
 
     console.log( "loading auth tokens ..." );
 
-    if ( ! existsSync( AUTH_FILE ) ) return;
+    if ( ! existsSync( AUTH_FILE ) ) return false;
     tokens = JSON.parse( await fs.readFile( AUTH_FILE ) );
 
     if ( isExpired( tokens ) ) {
@@ -51,6 +51,7 @@ async function restoreTokens() {
         await fetch( `http://localhost:${PORT}/refresh` );
     }
 
+    return true;
 }
 
 function isExpired( tokens ) {
