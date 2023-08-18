@@ -10,7 +10,7 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const PORT = Number( process.env.PORT ) || 8888;
 const AUTH_FILE = "db/auth.json";
 const LOCAL_URL = "http://localhost:" + PORT;
-const REDIRECT_URL = LOCAL_URL + "/callback";
+const REDIRECT_URI = LOCAL_URL + "/callback";
 
 const router = Router();
 let tokens = {};
@@ -82,7 +82,7 @@ router.get( "/login", ( req, res ) => {
         response_type: "code",
         client_id: CLIENT_ID,
         scope: SCOPE,
-        redirect_uri: REDIRECT_URL,
+        redirect_uri: REDIRECT_URI,
         state: state
     });
 
