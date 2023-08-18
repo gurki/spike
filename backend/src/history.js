@@ -58,7 +58,7 @@ async function fetchHistory() {
     }
 
     const values = newTracks.map( item => {
-        return [ item.played_at, item.track.uri, item.context.uri ].join( ',' );
+        return [ item.played_at, item.track.uri, item.context?.uri ].join( ',' );
     });
 
     values.reverse();   //  old to new to append
