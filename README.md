@@ -28,7 +28,14 @@ HISTORY_LIMIT=10
 STARTUP_FETCH_ALL=true
 ```
 
-install and run.
+## Build & run (Docker)
+
+```sh
+cd backend
+docker-compose up -d --build
+```
+
+## Build & run (bare metal)
 
 ```sh
 cd backend
@@ -37,18 +44,19 @@ yarn dev
 ```
 
 using pm2.
+
 ```sh
 cd backend
 pm2 start index.js --name "spike"
 ```
 
-login & create auth token.
+## Authorization
 
-http://localhost:8888/login
+login & create auth token at http://localhost:8888/login
 
 ## Overview
 everything is stored **locally**.
-the database lives as **files** in `/backend/db`.
+the database lives as **files** in `backend/db`.
 
 - `auth.json`: persistent spotify api [access tokens](https://developer.spotify.com/documentation/web-api/tutorials/code-flow)
 - `liked.json`: list of all [saved tracks](https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks)
@@ -68,6 +76,9 @@ newly discovered **saved tracks** are automatically added to the according month
 
 newly discovered **recently played tracks** are automatically appended to the **history**.
 
+### Docker volumes
+
+the storage directory `backend/db` is bind-mounted into the container, so all database files are persistent.
 
 ## Endpoints
 - `/login` - connect to spotify
