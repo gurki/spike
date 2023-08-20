@@ -59,7 +59,7 @@ function isExpired( tokens ) {
 }
 
 async function authorizationHeader() {
-    if ( isExpired( tokens ) ) await fetch( "http://localhost:8888/refresh" );
+    if ( isExpired( tokens ) ) await fetch( `http://localhost:${PORT}/refresh` );
     return { "Authorization": tokens.token_type + " " + tokens.access_token };
 }
 
