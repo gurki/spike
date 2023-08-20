@@ -10,7 +10,7 @@ App Description: watchdog for likes ❤️ and track history ⏳
 Redirect URI:    http://localhost:8888/callback
 ```
 
-create `.env` file in `/backend`, add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization) (client ID and client secret), and define settings.
+copy `/backend/.env.example` file to `/backend/.env`, add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization) (client ID and client secret), and define settings.
 
 ```env
 PORT=8888
@@ -38,6 +38,7 @@ yarn dev
 
 using pm2.
 ```sh
+cd backend
 pm2 start index.js --name "spike"
 ```
 
