@@ -7,6 +7,8 @@ import Playlists from "./src/playlists.js"
 import History from "./src/history.js"
 import Observer from "./src/observer.js"
 
+import { HistoryWatcher, LikesWatcher } from "./src/watcher.js"
+
 import express from "express"
 import cors from "cors"
 
@@ -66,10 +68,29 @@ app.listen( PORT, async () => {
 
     const authenticated = await Auth.init();
 
-    if ( !authenticated ) {
-        console.error( safeIcons.failure, `authentication failed. did you call http://localhost:${PORT}/login already?` );
+    if ( ! authenticated ) {
+        console.error( safeIcons.failure, `authentication failed. did you call http://127.0.0.1:${PORT}/login already?` );
         return;
     }
+
+    let history = new HistoryWatcher();
+    let likes = new LikesWatcher();
+
+    history.on( "tracksAdded", tracks => {
+        console.log( "new tracks:", tracks[0].played_at );
+    });
+
+    likes.on( "tracksAdded", tracks => {
+        console.log( "new likes: ",  tracks[0].added_at );
+    });
+
+    setInterval( () => {
+        history.update();
+        likes.update();
+    }, 1000 );
+
+    return;
+
 
     if ( STARTUP_FETCH_ALL ) {
         await Liked.fetch();
@@ -80,7 +101,6 @@ app.listen( PORT, async () => {
     }
 
     await History.load();
-
     Observer.start();
 
 });
