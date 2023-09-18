@@ -84,11 +84,8 @@ app.listen( PORT, async () => {
         console.log( "new likes: ",  tracks[0].added_at );
     });
 
-    setInterval( () => {
-        history.update();
-        likes.update();
-    }, 1000 );
-
+    history.start();
+    likes.start();
     return;
 
 

@@ -8,19 +8,33 @@ dotenv.config();
 const HISTORY_INTERVAL_S = Number( process.env.HISTORY_INTERVAL_S ) || 60;
 const HISTORY_LIMIT = Number( process.env.HISTORY_LIMIT ) || 10;
 
+const LIKES_INTERVAL_S = Number( process.env.LIKES_INTERVAL_S ) || 60;
+const LIKES_LIMIT = Number( process.env.LIKES_LIMIT ) || 10;
+
 
 class TrackWatcher extends EventEmitter {
 
-    constructor() {
+    constructor( interval, limit ) {
         super();
+        this.interval = interval || 60;
+        this.limit = limit || 10;
+        this.intervalId = undefined;
     }
 
     endpoint() {};
     filter() {};
 
+    start() {
+        this.intervalId = setInterval( () => this.update(), this.interval * 1000 );
+    };
+
+    stop() {
+        clearInterval( this.intervalId );
+    };
+
     async update() {
 
-        const url = `${this.endpoint()}limit=${HISTORY_LIMIT}`;
+        const url = `${this.endpoint()}limit=${this.limit}`;
         const headers = await Auth.getHeader();
         const data = await fetch( url, { headers } );
 
@@ -48,7 +62,7 @@ export class HistoryWatcher extends TrackWatcher {
     //  https://developer.spotify.com/documentation/web-api/reference/get-recently-played
     //  returns [ track, played_at, context ]
     constructor() {
-        super();
+        super( HISTORY_INTERVAL_S, HISTORY_LIMIT );
         this.after = Date.now();
     }
 
@@ -73,7 +87,7 @@ export class LikesWatcher extends TrackWatcher {
     //  https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
     //  returns [ track, added_at ]
     constructor() {
-        super();
+        super( LIKES_INTERVAL_S, LIKES_LIMIT );
         this.latest = Date.now();
     }
 
