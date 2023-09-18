@@ -73,6 +73,12 @@ async function fetchPlaylists() {
 
     while ( cursor.next !== null ) {
         const data = await fetch( cursor.next, { headers } );
+
+        if ( ! data.ok ) {
+            console.error( safeIcons.failure, "Cannot fetch playlists" )
+            return;
+        }
+
         cursor = await data.json();
         result.push( ...cursor.items );
     }

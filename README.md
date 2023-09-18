@@ -2,7 +2,15 @@
 a spotify **watchdog** and **database** for **likes ❤️** and track **history ⏳**.
 
 ## Setup
-create `.env` file in `/backend`, add your [spotify api tokens](https://developer.spotify.com/documentation/web-api) and define settings.
+create an app for the spotify [Web API](https://developer.spotify.com/documentation/web-api) on your spotify developer dashboard 
+
+```
+App Name:        my spike app
+App Description: watchdog for likes ❤️ and track history ⏳
+Redirect URI:    http://localhost:8888/callback
+```
+
+create `.env` file in `/backend`, add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization) (client ID and client secret), and define settings.
 
 ```env
 PORT=8888
@@ -32,6 +40,10 @@ using pm2.
 ```sh
 pm2 start index.js --name "spike"
 ```
+
+login & create auth token.
+
+http://localhost:8888/login
 
 ## Overview
 everything is stored **locally**.

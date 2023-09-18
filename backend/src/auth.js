@@ -10,7 +10,7 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const PORT = Number( process.env.PORT ) || 8888;
 const AUTH_FILE = "db/auth.json";
 const LOCAL_URL = "http://localhost:" + PORT;
-const REDIRECT_URL = LOCAL_URL + "/callback";
+const REDIRECT_URI = LOCAL_URL + "/callback";
 
 const router = Router();
 let tokens = {};
@@ -43,7 +43,7 @@ async function restoreTokens() {
 
     console.log( "loading auth tokens ..." );
 
-    if ( ! existsSync( AUTH_FILE ) ) return;
+    if ( ! existsSync( AUTH_FILE ) ) return false;
     tokens = JSON.parse( await fs.readFile( AUTH_FILE ) );
 
     if ( isExpired( tokens ) ) {
@@ -51,6 +51,7 @@ async function restoreTokens() {
         await fetch( `http://localhost:${PORT}/refresh` );
     }
 
+    return true;
 }
 
 function isExpired( tokens ) {
@@ -58,7 +59,7 @@ function isExpired( tokens ) {
 }
 
 async function authorizationHeader() {
-    if ( isExpired( tokens ) ) await fetch( "http://localhost:8888/refresh" );
+    if ( isExpired( tokens ) ) await fetch( `http://localhost:${PORT}/refresh` );
     return { "Authorization": tokens.token_type + " " + tokens.access_token };
 }
 
@@ -82,7 +83,7 @@ router.get( "/login", ( req, res ) => {
         response_type: "code",
         client_id: CLIENT_ID,
         scope: SCOPE,
-        redirect_uri: REDIRECT_URL,
+        redirect_uri: REDIRECT_URI,
         state: state
     });
 
