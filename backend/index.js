@@ -23,7 +23,7 @@ app.use( cors() );
 app.use( "/", Auth.router );
 
 
-app.get( "/user", async ( req, res ) => {
+app.get( "/user", async ( _, res ) => {
 
     const headers = Auth.getHeader();
     const data = await fetch( "https://api.spotify.com/v1/me", { headers });
@@ -34,29 +34,29 @@ app.get( "/user", async ( req, res ) => {
 });
 
 
-app.get( "/playlists", async ( req, res ) => {
+app.get( "/playlists", async ( _, res ) => {
     const names = Playlists.playlists.map( p => p.name );
     res.send( names );
 });
 
 
-app.get( "/liked", async ( req, res ) => {
+app.get( "/liked", async ( _, res ) => {
     res.send( Liked.liked.length.toFixed() + " liked songs" );
 });
 
 
-app.get( "/monthlies", async ( req, res ) => {
+app.get( "/monthlies", async ( _, res ) => {
     res.send( Object.keys( Playlists.monthlies ) );
 });
 
 
-app.get( "/fetch/liked", async ( req, res ) => {
+app.get( "/fetch/liked", async ( _, res ) => {
     Liked.fetch();
     res.sendStatus( 202 );
 });
 
 
-app.get( "/fetch/playlists", async ( req, res ) => {
+app.get( "/fetch/playlists", async ( _, res ) => {
     Playlists.fetch();
     res.sendStatus( 202 );
 });
@@ -89,15 +89,15 @@ app.listen( PORT, async () => {
     return;
 
 
-    if ( STARTUP_FETCH_ALL ) {
-        await Liked.fetch();
-        await Playlists.fetch();
-    } else {
-        await Liked.load();
-        await Playlists.load();
-    }
+    // if ( STARTUP_FETCH_ALL ) {
+    //     await Liked.fetch();
+    //     await Playlists.fetch();
+    // } else {
+    //     await Liked.load();
+    //     await Playlists.load();
+    // }
 
-    await History.load();
-    Observer.start();
+    // await History.load();
+    // Observer.start();
 
 });

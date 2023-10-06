@@ -4,6 +4,7 @@
   - db still has old entry and thinks it's the correct one
   - song gets added to "wrong" playlist
   - maybe re-fetch every day or so?
-
-## Rdeas
 -
+
+## Ideas
+- multi-user
