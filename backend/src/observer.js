@@ -42,17 +42,14 @@ async function handleNewLiked( newLiked ) {
 
         const month = item.added_at.substring( 0, 7 );
         const trackUri = item.track.uri;
-        const playlist = Playlists.find( month );
-        let playlistId;
+        let playlist = Playlists.find( month );
 
         if ( ! playlist ) {
             console.log( "playlist", month, "doesn't exist yet" );
-            const newPlaylist = await Playlists.create( month );
-            playlistId = newPlaylist.id;
+            playlist = await Playlists.create( month );
         }
 
-        playlistId = playlist.id;
-        Playlists.addTrack( trackUri, playlistId );
+        Playlists.addTrack( trackUri, playlist.id );
 
     }
 
