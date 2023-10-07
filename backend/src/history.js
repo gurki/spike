@@ -39,7 +39,7 @@ export class History {
         }
 
         this.items = buffer.toString().split( "\n" ).slice( 1 );
-        console.success( icons.file, `read ${this.items.length} tracks` );
+        console.success( icons.file, `read ${this.items.length} track history` );
 
     }
 
