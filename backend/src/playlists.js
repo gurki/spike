@@ -1,7 +1,7 @@
 import fs from "fs/promises"
 import { existsSync } from "fs";
 import Auth from "./auth.js";
-import { safeIcons } from "./bugle.js"
+import { icons } from "./bugle.js"
 
 const PLAYLISTS_FILE = "db/playlists.json";
 
@@ -26,7 +26,7 @@ async function load() {
     playlists = JSON.parse( buffer );
     didUpdate();
 
-    console.log( safeIcons.success, "read", playlists.length, "playlists" );
+    console.log( icons.success, "read", playlists.length, "playlists" );
 
 }
 
@@ -75,7 +75,7 @@ async function fetchPlaylists() {
         const data = await fetch( cursor.next, { headers } );
 
         if ( ! data.ok ) {
-            console.error( safeIcons.failure, "Cannot fetch playlists" )
+            console.error( icons.failure, "Cannot fetch playlists" )
             return;
         }
 
@@ -87,14 +87,14 @@ async function fetchPlaylists() {
     playlists = result;
     didUpdate();
 
-    console.log( safeIcons.success, "fetched", result.length, "playlists" );
+    console.log( icons.cloud, `fetched ${result.length} playlists` );
 
 }
 
 
 async function addTrack( trackUri, playlistId ) {
 
-    console.log( "add", trackUri, "to", playlistId, "..." );
+    // console.log( "adding", trackUri, "to", playlistId, "..." );
 
     const playlistUrl = "https://api.spotify.com/v1/playlists/" + playlistId + "/tracks";
     const headers = await Auth.getHeader();
@@ -102,15 +102,15 @@ async function addTrack( trackUri, playlistId ) {
 
     if ( data.status !== 200 ) {
         console.error( data.statusText );
-        return;
+        return false;
     }
 
     const uriJson = await data.json()
     const uris = uriJson.items.map( item => item.track.uri );
 
     if ( uris.includes( trackUri ) ) {
-        console.info( "track already exists" );
-        return;
+        console.info( "🤷 track already exists" );
+        return false;
     }
 
     const postData = await fetch( playlistUrl, {
@@ -120,9 +120,12 @@ async function addTrack( trackUri, playlistId ) {
     });
 
     if ( postData.status != 201 ) {
-        console.error( safeIcons.failure, "couldn't add track" );
+        console.error( icons.failure, "couldn't add track" );
         console.error( postData.status, postData.statusText );
+        return false;
     }
+
+    return true;
 
 }
 
@@ -145,6 +148,23 @@ function didUpdate() {
 }
 
 
+async function addMonthly( item ) {
+
+    const month = item.added_at.substring( 0, 7 );
+    const trackUri = item.track.uri;
+    let playlist = Playlists.find( month );
+
+    if ( ! playlist ) {
+        console.log( icons.writing, `creating playlist ${month}`, "..." );
+        playlist = await Playlists.create( month );
+    }
+
+    Playlists.addTrack( trackUri, playlist.id );
+    console.success( `📅 added ${trackUri} to ${playlist.id}` );
+
+}
+
+
 const Playlists = {
     playlists,
     monthlies,
@@ -152,7 +172,8 @@ const Playlists = {
     fetch: fetchPlaylists,
     find,
     addTrack,
-    create: createPlaylist
+    create: createPlaylist,
+    addMonthly
 };
 
 export default Playlists;

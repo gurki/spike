@@ -18,21 +18,21 @@ class TrackWatcher extends EventEmitter {
         super();
         this.interval = interval || 60;
         this.limit = limit || 10;
-        this.intervalId = undefined;
+        this.lastUpdate = 0;
     }
 
-    endpoint() {};
-    filter() {};
-
-    start() {
-        this.intervalId = setInterval( () => this.update(), this.interval * 1000 );
-    };
-
-    stop() {
-        clearInterval( this.intervalId );
-    };
+    // endpoint() {};
+    // filter( items ) {};
 
     async update() {
+
+        const timestamp = Date.now();
+
+        if ( timestamp < this.lastUpdate + this.interval * 1000 ) {
+            return;
+        }
+
+        this.lastUpdate = timestamp;
 
         const url = `${this.endpoint()}limit=${this.limit}`;
         const headers = await Auth.getHeader();
@@ -73,10 +73,19 @@ export class HistoryWatcher extends TrackWatcher {
     }
 
     filter( items ) {
-        const added = items.filter( item => new Date( item.played_at ).getTime() > this.after );
+
+        items.forEach( item => item.timestamp = new Date( item.played_at ).getTime() );
+        let added = items.filter( item => item.timestamp > this.after );
+
         if ( added.length === 0 ) return;
-        this.after = Date.now();
-        this.emit( "tracksAdded", added );
+
+        added.sort( ( a, b ) => a.timestamp - b.timestamp );
+        this.after = added[ added.length - 1 ].timestamp;
+
+        for ( const item of added ) {
+            this.emit( "trackAdded", item );
+        }
+
     }
 
 }
@@ -96,10 +105,19 @@ export class LikesWatcher extends TrackWatcher {
     }
 
     filter( items ) {
-        const added = items.filter( item => new Date( item.added_at ).getTime() > this.latest );
+
+        items.forEach( item => item.timestamp = new Date( item.added_at ).getTime() );
+        const added = items.filter( item => item.timestamp > this.latest );
+
         if ( added.length === 0 ) return;
-        this.latest = new Date( added[ 0 ].added_at ).getTime();
-        this.emit( "tracksAdded", added );
+
+        added.sort( ( a, b ) => a.timestamp - b.timestamp );
+        this.latest = added[ added.length - 1 ].timestamp;
+
+        for ( const item of added ) {
+            this.emit( "trackAdded", item );
+        }
+
     }
 
 }

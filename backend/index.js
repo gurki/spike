@@ -1,12 +1,10 @@
 import "./src/bugle.js"
-import { safeIcons } from "./src/bugle.js"
+import { icons } from "./src/bugle.js"
 
 import Auth from "./src/auth.js"
-import Liked from "./src/liked.js"
 import Playlists from "./src/playlists.js"
-import History from "./src/history.js"
-import Observer from "./src/observer.js"
 
+import { History } from "./src/history.js"
 import { HistoryWatcher, LikesWatcher } from "./src/watcher.js"
 
 import express from "express"
@@ -15,8 +13,8 @@ import cors from "cors"
 import * as dotenv from "dotenv"
 dotenv.config();
 
+const CLIENT_ID = process.env.CLIENT_ID || "n/a";
 const PORT = process.env.PORT || 8888;
-const STARTUP_FETCH_ALL = process.env.STARTUP_FETCH_ALL || false;
 
 const app = express();
 app.use( cors() );
@@ -62,42 +60,31 @@ app.get( "/fetch/playlists", async ( _, res ) => {
 });
 
 
+let history = new History();
+let historyWatcher = new HistoryWatcher();
+let likesWatcher = new LikesWatcher();
+
+
 app.listen( PORT, async () => {
 
-    console.log( safeIcons.started, "spike 🦔 listening on", PORT, "..." );
+    console.log( "🦔 spike listening on", PORT, "..." );
 
     const authenticated = await Auth.init();
 
     if ( ! authenticated ) {
-        console.error( safeIcons.failure, `authentication failed. did you call http://127.0.0.1:${PORT}/login already?` );
+        console.error( icons.failure, `authentication failed. 😢 visit http://127.0.0.1:${PORT}/login to log in 👋` );
         return;
     }
 
-    let history = new HistoryWatcher();
-    let likes = new LikesWatcher();
+    console.success( icons.request, `authenticated as ${CLIENT_ID}` );
 
-    history.on( "tracksAdded", tracks => {
-        console.log( "new tracks:", tracks[0].played_at );
-    });
+    history.load();
+    historyWatcher.on( "trackAdded", item => history.append( item ) );
+    likesWatcher.on( "trackAdded", item => Playlists.addMonthly( item ) );
 
-    likes.on( "tracksAdded", tracks => {
-        console.log( "new likes: ",  tracks[0].added_at );
-    });
-
-    history.start();
-    likes.start();
-    return;
-
-
-    // if ( STARTUP_FETCH_ALL ) {
-    //     await Liked.fetch();
-    //     await Playlists.fetch();
-    // } else {
-    //     await Liked.load();
-    //     await Playlists.load();
-    // }
-
-    // await History.load();
-    // Observer.start();
+    setInterval( () => {
+        historyWatcher.update();
+        likesWatcher.update();
+    }, 10 * 1000 );
 
 });
