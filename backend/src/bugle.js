@@ -6,6 +6,8 @@ let info = console.info;
 let debug = console.debug;
 let warn = console.warn;
 let error = console.error;
+let success = console.log;
+
 
 console.log = function() {
 
@@ -78,7 +80,22 @@ console.debug = function() {
 }
 
 
-const icons = {
+console.success = function() {
+
+    let args = [];
+    const time = new Date().toISOString().substring( 11, 19 );
+    args.push( chalk.greenBright( "[" + time + "] " ) );
+
+    for( var i = 0; i < arguments.length; i++ ) {
+        args.push( arguments[i] );
+    }
+
+    success.apply( console, args );
+
+}
+
+
+export const icons = {
     success: "✔️",
     failure: "❌",
     started: "⏳",
@@ -88,6 +105,7 @@ const icons = {
     running: "🏃",
     timing: "⏱️",
     writing: "✏️",
+    reading: "👓",
     bug: "🐞",
 
     debug: "🛠️",

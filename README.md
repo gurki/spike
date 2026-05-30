@@ -2,12 +2,12 @@
 a spotify **watchdog** and **database** for **likes ❤️** and track **history ⏳**.
 
 ## Setup
-create an app for the spotify [Web API](https://developer.spotify.com/documentation/web-api) on your spotify developer dashboard 
+create an app for the spotify [Web API](https://developer.spotify.com/documentation/web-api) on your spotify developer dashboard
 
 ```
 App Name:        my spike app
 App Description: watchdog for likes ❤️ and track history ⏳
-Redirect URI:    http://localhost:8888/callback
+Redirect URI:    http://127.0.0.1:8888/callback
 ```
 
 copy `/backend/.env.example` file to `/backend/.env`, add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization) (client ID and client secret), and define settings.

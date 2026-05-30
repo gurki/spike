@@ -1,11 +1,11 @@
 import "./src/bugle.js"
-import { safeIcons } from "./src/bugle.js"
+import { icons } from "./src/bugle.js"
 
 import Auth from "./src/auth.js"
-import Liked from "./src/liked.js"
 import Playlists from "./src/playlists.js"
-import History from "./src/history.js"
-import Observer from "./src/observer.js"
+
+import { History } from "./src/history.js"
+import { HistoryWatcher, LikesWatcher } from "./src/watcher.js"
 
 import express from "express"
 import cors from "cors"
@@ -13,15 +13,15 @@ import cors from "cors"
 import * as dotenv from "dotenv"
 dotenv.config();
 
+const CLIENT_ID = process.env.CLIENT_ID || "n/a";
 const PORT = process.env.PORT || 8888;
-const STARTUP_FETCH_ALL = process.env.STARTUP_FETCH_ALL || false;
 
 const app = express();
 app.use( cors() );
 app.use( "/", Auth.router );
 
 
-app.get( "/user", async ( req, res ) => {
+app.get( "/user", async ( _, res ) => {
 
     const headers = Auth.getHeader();
     const data = await fetch( "https://api.spotify.com/v1/me", { headers });
@@ -32,55 +32,59 @@ app.get( "/user", async ( req, res ) => {
 });
 
 
-app.get( "/playlists", async ( req, res ) => {
+app.get( "/playlists", async ( _, res ) => {
     const names = Playlists.playlists.map( p => p.name );
     res.send( names );
 });
 
 
-app.get( "/liked", async ( req, res ) => {
+app.get( "/liked", async ( _, res ) => {
     res.send( Liked.liked.length.toFixed() + " liked songs" );
 });
 
 
-app.get( "/monthlies", async ( req, res ) => {
+app.get( "/monthlies", async ( _, res ) => {
     res.send( Object.keys( Playlists.monthlies ) );
 });
 
 
-app.get( "/fetch/liked", async ( req, res ) => {
+app.get( "/fetch/liked", async ( _, res ) => {
     Liked.fetch();
     res.sendStatus( 202 );
 });
 
 
-app.get( "/fetch/playlists", async ( req, res ) => {
+app.get( "/fetch/playlists", async ( _, res ) => {
     Playlists.fetch();
     res.sendStatus( 202 );
 });
 
 
+let history = new History();
+let historyWatcher = new HistoryWatcher();
+let likesWatcher = new LikesWatcher();
+
+
 app.listen( PORT, async () => {
 
-    console.log( safeIcons.started, "spike 🦔 listening on", PORT, "..." );
+    console.log( "🦔 spike listening on", PORT, "..." );
 
     const authenticated = await Auth.init();
 
-    if ( !authenticated ) {
-        console.error( safeIcons.failure, `authentication failed. did you call http://localhost:${PORT}/login already?` );
+    if ( ! authenticated ) {
+        console.error( icons.failure, `authentication failed. 😢 visit http://127.0.0.1:${PORT}/login to log in 👋` );
         return;
     }
 
-    if ( STARTUP_FETCH_ALL ) {
-        await Liked.fetch();
-        await Playlists.fetch();
-    } else {
-        await Liked.load();
-        await Playlists.load();
-    }
+    console.success( icons.request, `authenticated as ${CLIENT_ID}` );
 
-    await History.load();
+    history.load();
+    historyWatcher.on( "trackAdded", item => history.append( item ) );
+    likesWatcher.on( "trackAdded", item => Playlists.addMonthly( item ) );
 
-    Observer.start();
+    setInterval( () => {
+        historyWatcher.update();
+        likesWatcher.update();
+    }, 10 * 1000 );
 
 });

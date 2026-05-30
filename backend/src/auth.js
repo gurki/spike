@@ -9,7 +9,7 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const PORT = Number( process.env.PORT ) || 8888;
 const AUTH_FILE = "db/auth.json";
-const LOCAL_URL = "http://localhost:" + PORT;
+const LOCAL_URL = "http://127.0.0.1:" + PORT;
 const REDIRECT_URI = LOCAL_URL + "/callback";
 
 const router = Router();
@@ -32,7 +32,12 @@ async function updateTokens( newTokens ) {
 
     tokens = Object.assign( {}, tokens, newTokens );
     tokens.created_at = Date.now();
-    fs.writeFile( AUTH_FILE, JSON.stringify( tokens, null, 2 ) );
+
+    if ( ! existsSync( "db" ) ) {
+        await fs.mkdir( "db" );
+    }
+
+    await fs.writeFile( AUTH_FILE, JSON.stringify( tokens, null, 2 ) );
 
     console.log( "new token expires at", new Date( tokens.created_at ).toISOString() );
 
@@ -48,18 +53,20 @@ async function restoreTokens() {
 
     if ( isExpired( tokens ) ) {
         console.warn( "token expired" );
-        await fetch( `http://localhost:${PORT}/refresh` );
+        await fetch( `http://127.0.0.1:${PORT}/refresh` );
     }
 
     return true;
 }
 
+
 function isExpired( tokens ) {
     return new Date( tokens.created_at + ( tokens.expires_in - 10 ) * 1000 ) < Date.now();
 }
 
+
 async function authorizationHeader() {
-    if ( isExpired( tokens ) ) await fetch( `http://localhost:${PORT}/refresh` );
+    if ( isExpired( tokens ) ) await fetch( `http://127.0.0.1:${PORT}/refresh` );
     return { "Authorization": tokens.token_type + " " + tokens.access_token };
 }
 
