@@ -1,0 +1,12 @@
+version: '2'
+
+services:
+  backend:
+    build:
+      dockerfile: "./Dockerfile"
+    container_name: spike-backend
+    env_file: ".env"
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./db:/usr/src/backend/db
