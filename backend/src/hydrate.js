@@ -9,8 +9,11 @@ import { upsertTrack } from "./eventstore.js"
 const ARTWORK_DIR = process.env.SPIKE_ARTWORK_DIR
     || join(resolve(import.meta.dirname, "../db"), "artwork")
 
-function artworkPath(sha256) {
-    return join(ARTWORK_DIR, "sha256", sha256.slice(0, 2), sha256)
+// Same layout as the journey blob store: sha256/<aa>/<bb>/<full-hash>,
+// no extension - the path is derivable from the hash alone; content type
+// lives in the artwork table.
+export function artworkPath(sha256) {
+    return join(ARTWORK_DIR, "sha256", sha256.slice(0, 2), sha256.slice(2, 4), sha256)
 }
 
 // Download bytes into the content-addressed store; idempotent by hash.
@@ -22,6 +25,11 @@ async function storeArtwork(db, url) {
     if (!res.ok) throw new Error(`artwork download failed: ${res.status} ${url}`)
     const bytes = Buffer.from(await res.arrayBuffer())
     const sha256 = createHash("sha256").update(bytes).digest("hex")
+
+    // dedupe by content: the same bytes from a different url reuse the row
+    const byHash = db.prepare("SELECT sha256 FROM artwork WHERE sha256 = ?").get(sha256)
+    if (byHash) return byHash.sha256
+
     const path = artworkPath(sha256)
 
     if (!existsSync(path)) {

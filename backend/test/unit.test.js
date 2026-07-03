@@ -105,6 +105,16 @@ test("heard events dedupe on played_at", () => {
     assert.equal(recordHeard("2024-07-04T08:00:00.123Z", track).inserted, false)
 })
 
+// --- artwork store -----------------------------------------------------------------
+
+test("artworkPath uses journey-style two-level sharding, no extension", async () => {
+    const { artworkPath } = await import("../src/hydrate.js")
+    const hash = "ab" + "cd" + "e".repeat(60)
+    const path = artworkPath(hash)
+    assert.ok(path.endsWith(`sha256/ab/cd/${hash}`))
+    assert.ok(!path.includes("."), "no file extension")
+})
+
 // --- desired state ----------------------------------------------------------------
 
 test("desiredByMonth groups by berlin month and sets aside local files", () => {

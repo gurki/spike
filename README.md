@@ -127,8 +127,10 @@ up on the next poll or `sync-likes`.
 ### Artwork
 
 `hydrate` downloads each album's cover (largest size) once into a
-content-addressed store (`db/artwork/sha256/<aa>/<hash>`) and links tracks to
-it - ready to be pushed as blobs to a future journey server.
+content-addressed store (`db/artwork/sha256/<aa>/<bb>/<hash>`, the same
+layout as the journey blob store, no extensions - content type lives in the
+database) and links tracks to it - ready to be pushed as blobs to a future
+journey server.
 
 ## Endpoints
 
