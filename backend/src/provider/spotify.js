@@ -130,23 +130,27 @@ async function fetchPlaylists() {
     }))
 }
 
+// February 2026 api surface: /playlists/{id}/items replaces .../tracks, entries
+// nest under `item` (transitionally aliased as `track`), and the DELETE body
+// key is `items`. Verified empirically 2026-07 against a scratch playlist.
 async function fetchPlaylistItems(playlistId) {
-    const fields = "next,items(added_at,is_local,track(uri,is_local,linked_from(uri)))"
-    const url = `${API}/playlists/${playlistId}/tracks?limit=100&fields=${encodeURIComponent(fields)}`
+    const fields = "next,items(added_at,is_local,item(uri,is_local,linked_from(uri)))"
+    const url = `${API}/playlists/${playlistId}/items?limit=100&fields=${encodeURIComponent(fields)}`
     const { items } = await fetchPaginated(url)
 
     return items
-        .filter((item) => item.track?.uri)
-        .map((item) => ({
-            addedAt: item.added_at,
-            uri: canonicalUri(item.track),
-            isLocal: Boolean(item.track.is_local || item.is_local),
+        .map((entry) => ({ entry, inner: entry.item ?? entry.track }))
+        .filter(({ inner }) => inner?.uri)
+        .map(({ entry, inner }) => ({
+            addedAt: entry.added_at,
+            uri: canonicalUri(inner),
+            isLocal: Boolean(inner.is_local || entry.is_local),
         }))
 }
 
 async function addTracksToPlaylist(playlistId, uris) {
     for (let i = 0; i < uris.length; i += 100) {
-        await request(`${API}/playlists/${playlistId}/tracks`, {
+        await request(`${API}/playlists/${playlistId}/items`, {
             method: "POST",
             body: { uris: uris.slice(i, i + 100) },
         })
@@ -155,9 +159,9 @@ async function addTracksToPlaylist(playlistId, uris) {
 
 async function removeTracksFromPlaylist(playlistId, uris) {
     for (let i = 0; i < uris.length; i += 100) {
-        await request(`${API}/playlists/${playlistId}/tracks`, {
+        await request(`${API}/playlists/${playlistId}/items`, {
             method: "DELETE",
-            body: { tracks: uris.slice(i, i + 100).map((uri) => ({ uri })) },
+            body: { items: uris.slice(i, i + 100).map((uri) => ({ uri })) },
         })
     }
 }
@@ -179,11 +183,36 @@ async function createMonthlyPlaylist(month) {
 
 // --- tracks --------------------------------------------------------------
 
+// Batch fetch, falling back to per-track requests if the batch endpoint is
+// ever removed for this app (slated for removal in the feb 2026 migration;
+// still live as of 2026-07).
+let batchTracksAvailable = true
+
 async function fetchTracksBatch(trackIds) {
     const tracks = []
     for (let i = 0; i < trackIds.length; i += 50) {
-        const page = await request(`${API}/tracks?ids=${trackIds.slice(i, i + 50).join(",")}`)
-        tracks.push(...(page.tracks ?? []).filter(Boolean))
+        const chunk = trackIds.slice(i, i + 50)
+
+        if (batchTracksAvailable) {
+            try {
+                const page = await request(`${API}/tracks?ids=${chunk.join(",")}`)
+                tracks.push(...(page.tracks ?? []).filter(Boolean))
+                continue
+            } catch (error) {
+                if (!(error instanceof SpotifyApiError && [400, 404, 410].includes(error.status))) throw error
+                batchTracksAvailable = false
+                console.warn("⚠️ batch /tracks endpoint gone, falling back to per-track fetches")
+            }
+        }
+
+        for (const id of chunk) {
+            try {
+                tracks.push(await request(`${API}/tracks/${id}`))
+            } catch (error) {
+                if (error instanceof SpotifyApiError && [400, 404].includes(error.status)) continue
+                throw error
+            }
+        }
     }
     return tracks
 }
