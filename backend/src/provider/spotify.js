@@ -1,126 +1,204 @@
-import * as dotenv from "dotenv"
-dotenv.config()
-
-import Auth from "./auth.js"
+import Auth from "../auth.js"
 import { registerAdapter, validateAdapter } from "./adapter.js"
+import { canonicalUri } from "../canonical.js"
+
+const API = "https://api.spotify.com/v1"
+
+export class SpotifyApiError extends Error {
+    constructor(status, url) {
+        super(`spotify api error ${status} for ${url}`)
+        this.status = status
+        this.url = url
+    }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Every API call routes through here: 429 honors Retry-After, 5xx/network
+// errors back off exponentially, a 401 forces one token refresh.
+async function request(url, { method = "GET", body, maxRetries = 4 } = {}) {
+    let refreshed = false
+
+    for (let attempt = 0; ; attempt++) {
+        const headers = await Auth.getHeader()
+        if (body) headers["Content-Type"] = "application/json"
+
+        let res
+        try {
+            res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined })
+        } catch (error) {
+            if (attempt >= maxRetries) throw error
+            await sleep(1000 * 2 ** attempt)
+            continue
+        }
+
+        if (res.ok) {
+            return res.status === 204 ? null : await res.json()
+        }
+
+        if (res.status === 401 && !refreshed) {
+            refreshed = true
+            await Auth.refreshTokens()
+            continue
+        }
+
+        if (res.status === 429 && attempt < maxRetries) {
+            const retryAfter = Number(res.headers.get("retry-after")) || 1
+            await sleep(retryAfter * 1000 + Math.random() * 250)
+            continue
+        }
+
+        if (res.status >= 500 && attempt < maxRetries) {
+            await sleep(1000 * 2 ** attempt)
+            continue
+        }
+
+        throw new SpotifyApiError(res.status, url)
+    }
+}
 
 async function fetchPaginated(url) {
-    const headers = await Auth.getHeader()
-    let cursor = { next: url }
-    let results = []
+    let items = []
+    let total = 0
+    let next = url
 
-    while (cursor.next) {
-        const data = await fetch(cursor.next, { headers })
-        if (!data.ok) {
-            console.error(`❌ Cannot fetch from ${url}`)
-            return results
-        }
-        cursor = await data.json()
-        results.push(...cursor.items)
+    while (next) {
+        const page = await request(next)
+        items.push(...(page.items ?? []))
+        total = page.total ?? items.length
+        next = page.next
     }
 
-    return results
+    return { items, total }
 }
 
+// --- likes ---------------------------------------------------------------
 
-async function fetchLikes(latestAfter) {
-    console.log("👂 fetching likes ...")
-
-    const items = await fetchPaginated("https://api.spotify.com/v1/me/tracks?limit=50")
-
+// Full library rebuild: every saved track with its verbatim added_at.
+async function fetchAllLikes() {
+    console.log("👂 fetching all likes ...")
+    const { items, total } = await fetchPaginated(`${API}/me/tracks?limit=50`)
     console.log("✅ fetched", items.length, "likes")
-
-    // Return items with _added_at timestamp for the watcher to track
-    return items.map((item) => ({
-        ...item.track,
-        _added_at: new Date(item.added_at).getTime(),
-    }))
+    return { items, total }
 }
 
+async function fetchLikedTotal() {
+    const page = await request(`${API}/me/tracks?limit=1`)
+    return page.total
+}
 
-async function fetchHistory(after) {
-    console.log("👂 fetching history ...")
+// Incremental poll: likes come back newest-first, so stop paginating as soon
+// as a page reaches the cursor. Steady state is a single request.
+async function fetchLikes(latestAfterMs) {
+    let next = `${API}/me/tracks?limit=50`
+    const items = []
 
-    let url = after === 0
-        ? "https://api.spotify.com/v1/me/player/recently-played"
-        : `https://api.spotify.com/v1/me/player/recently-played?after=${after}&limit=${process.env.HISTORY_LIMIT || 10}`
-
-    const headers = await Auth.getHeader()
-    const data = await fetch(url, { headers })
-    if (!data.ok) {
-        console.error("❌ Cannot fetch history")
-        return { items: [] }
+    while (next) {
+        const page = await request(next)
+        for (const item of page.items ?? []) {
+            if (Date.parse(item.added_at) <= latestAfterMs) return items
+            items.push(item)
+        }
+        next = page.next
     }
 
-    const res = await data.json()
-
-    const items = (res.items ?? []).map((item) => ({
-        ...item.track,
-        _played_at: new Date(item.played_at).getTime(),
-        context: item.context
-            ? { type: item.context.type, uri: item.context.uri, href: item.context.href }
-            : null,
-    }))
-
-    const afterTime = items.length > 0 ? new Date(items[items.length - 1].played_at).getTime() : after
-    console.log("✅ fetched", items.length, "historied tracks")
-
-    return { items, after: afterTime }
+    return items
 }
 
+// --- history -------------------------------------------------------------
+
+async function fetchHistory(afterMs) {
+    const url = afterMs > 0
+        ? `${API}/me/player/recently-played?after=${afterMs}&limit=50`
+        : `${API}/me/player/recently-played?limit=50`
+
+    const page = await request(url)
+    return page.items ?? []
+}
+
+// --- playlists -----------------------------------------------------------
 
 async function fetchPlaylists() {
     console.log("🏷️ fetching playlists ...")
-
-    const headers = await Auth.getHeader()
-    let cursor = { next: "https://api.spotify.com/v1/me/playlists?limit=50" }
-    let allPlaylists = []
-
-    while (cursor.next) {
-        const data = await fetch(cursor.next, { headers })
-        if (!data.ok) {
-            console.error("❌ Cannot fetch playlists")
-            return { uris: [], names: [] }
-        }
-        const res = await data.json()
-        allPlaylists.push(...res.items)
-        cursor.next = res.next
-    }
-
-    const uris = allPlaylists.map((p) => `spotify:playlist:${p.id}`)
-    const names = allPlaylists.map((p) => ({ uri: `spotify:playlist:${p.id}`, name: p.name }))
-
-    console.log("✅ fetched", allPlaylists.length, "playlists")
-    return { uris, names }
+    const { items } = await fetchPaginated(`${API}/me/playlists?limit=50`)
+    return items.map((p) => ({
+        id: p.id,
+        uri: `spotify:playlist:${p.id}`,
+        name: p.name,
+        snapshotId: p.snapshot_id,
+        tracksTotal: p.tracks?.total ?? 0,
+    }))
 }
 
+async function fetchPlaylistItems(playlistId) {
+    const fields = "next,items(added_at,is_local,track(uri,is_local,linked_from(uri)))"
+    const url = `${API}/playlists/${playlistId}/tracks?limit=100&fields=${encodeURIComponent(fields)}`
+    const { items } = await fetchPaginated(url)
+
+    return items
+        .filter((item) => item.track?.uri)
+        .map((item) => ({
+            addedAt: item.added_at,
+            uri: canonicalUri(item.track),
+            isLocal: Boolean(item.track.is_local || item.is_local),
+        }))
+}
+
+async function addTracksToPlaylist(playlistId, uris) {
+    for (let i = 0; i < uris.length; i += 100) {
+        await request(`${API}/playlists/${playlistId}/tracks`, {
+            method: "POST",
+            body: { uris: uris.slice(i, i + 100) },
+        })
+    }
+}
+
+async function removeTracksFromPlaylist(playlistId, uris) {
+    for (let i = 0; i < uris.length; i += 100) {
+        await request(`${API}/playlists/${playlistId}/tracks`, {
+            method: "DELETE",
+            body: { tracks: uris.slice(i, i + 100).map((uri) => ({ uri })) },
+        })
+    }
+}
 
 async function createMonthlyPlaylist(month) {
     console.log("📅 creating monthly playlist", month, "...")
-
-    const headers = await Auth.getHeader()
-    const res = await fetch("https://api.spotify.com/v1/me/playlists", {
+    const playlist = await request(`${API}/me/playlists`, {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: month, public: false }),
+        body: { name: month, public: false },
     })
-
-    if (res.status !== 201) {
-        console.error("❌ Failed to create monthly playlist")
-        return null
+    return {
+        id: playlist.id,
+        uri: `spotify:playlist:${playlist.id}`,
+        name: playlist.name,
+        snapshotId: playlist.snapshot_id,
+        tracksTotal: 0,
     }
-
-    const playlist = await res.json()
-    console.log(`✅ created playlist "${month}" (${playlist.id})`)
-    return playlist.id
 }
 
+// --- tracks --------------------------------------------------------------
+
+async function fetchTracksBatch(trackIds) {
+    const tracks = []
+    for (let i = 0; i < trackIds.length; i += 50) {
+        const page = await request(`${API}/tracks?ids=${trackIds.slice(i, i + 50).join(",")}`)
+        tracks.push(...(page.tracks ?? []).filter(Boolean))
+    }
+    return tracks
+}
 
 const SpotifyAdapter = validateAdapter("spotify", {
     fetchLikes,
+    fetchAllLikes,
+    fetchLikedTotal,
     fetchHistory,
     fetchPlaylists,
+    fetchPlaylistItems,
+    addTracksToPlaylist,
+    removeTracksFromPlaylist,
     createMonthlyPlaylist,
+    fetchTracksBatch,
 })
 
 registerAdapter("spotify", SpotifyAdapter)
