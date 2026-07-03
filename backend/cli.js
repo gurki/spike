@@ -103,6 +103,14 @@ const commands = {
         return body.ok ? 0 : 2
     },
 
+    "import-history": async (flags) => {
+        const { body } = await call("POST", "/ops/import-history", flags)
+        console.log(`✅ ${body.imported} plays imported from ${body.files} files ` +
+            `(${body.entries} entries: ${body.tooShort} too short, ${body.noUri} without track uri, ` +
+            `${body.nearDuplicates} near-duplicates skipped)`)
+        return 0
+    },
+
     "hydrate": async (flags) => {
         const { body } = await call("POST", "/ops/hydrate", flags)
         console.log(`⏳ hydrate started (job ${body.id})`)
@@ -153,6 +161,7 @@ commands:
   reconcile [--dry-run] [--prune] [--month YYYY-MM] [--refresh]
                                    sync monthly playlists to liked songs
   verify [--strict] [--deep]       consistency + integrity checks (exit 2 on drift)
+  import-history --path <dir>      import a spotify gdpr extended streaming history
   hydrate                          backfill track metadata + album artwork
   stats                            totals, likes per month, top artists
   events [--month] [--kind] [--limit]

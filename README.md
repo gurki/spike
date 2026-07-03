@@ -117,6 +117,21 @@ reconstructed from the api. **limitation:** spotify only exposes the last ~50
 recently-played tracks, so `heard` history is live-capture only - keep the
 daemon running.
 
+the one exception: your **full lifetime play history** can be rebuilt from
+spotify's gdpr export. request the **extended streaming history** under
+[account privacy settings](https://www.spotify.com/account/privacy/) (arrives
+by email within ~30 days), unzip it somewhere the daemon can read, and run
+
+```sh
+bun cli.js import-history --path /path/to/my_spotify_data
+```
+
+plays shorter than 30s are skipped (`--min-ms` to change), entries without a
+track uri (podcasts, or the basic non-extended export) are ignored, and a
+±2 minute fuzzy window prevents duplicates where the export overlaps
+live-captured plays. re-importing is a no-op. run `hydrate` afterwards to
+fill in metadata and artwork for historical tracks.
+
 ### Watchers
 
 the daemon polls likes and recently-played every `*_INTERVAL_S` seconds,

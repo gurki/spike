@@ -68,6 +68,12 @@ export async function verify(flags = {}) {
     return verifyImpl(flags) // does its own full likes sync internally
 }
 
+// Rebuild play history from a Spotify GDPR extended-streaming-history export.
+export async function importHistory(flags = {}) {
+    const { importHistory: impl } = await import("./import_history.js")
+    return impl(flags)
+}
+
 // Long-running: run as a job, poll via GET /ops/jobs/:id.
 export function startHydrate() {
     let job = null

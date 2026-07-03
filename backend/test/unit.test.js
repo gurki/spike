@@ -115,6 +115,41 @@ test("artworkPath uses journey-style two-level sharding, no extension", async ()
     assert.ok(!path.includes("."), "no file extension")
 })
 
+// --- gdpr history import ------------------------------------------------------------
+
+test("importHistory: filters, fuzzy dedupe, idempotence", async () => {
+    const { importHistory } = await import("../src/import_history.js")
+    const { writeFileSync, mkdtempSync } = await import("node:fs")
+    const { join } = await import("node:path")
+    const { tmpdir } = await import("node:os")
+
+    const dir = mkdtempSync(join(tmpdir(), "spike-gdpr-"))
+    const entry = (ts, uri, ms) => ({
+        ts, ms_played: ms, spotify_track_uri: uri,
+        master_metadata_track_name: "T", master_metadata_album_artist_name: "A",
+    })
+    writeFileSync(join(dir, "Streaming_History_Audio_2020_0.json"), JSON.stringify([
+        entry("2020-03-01T10:00:00Z", "spotify:track:gdpr1", 200000),
+        entry("2020-03-01T11:00:00Z", "spotify:track:gdpr1", 200000),   // same track, later play
+        entry("2020-03-02T10:00:00Z", "spotify:track:gdpr2", 5000),    // too short
+        { ts: "2020-03-03T10:00:00Z", ms_played: 200000, spotify_episode_uri: "spotify:episode:x" }, // no track uri
+    ]))
+
+    const first = importHistory({ path: dir })
+    assert.equal(first.imported, 2)
+    assert.equal(first.tooShort, 1)
+    assert.equal(first.noUri, 1)
+
+    const again = importHistory({ path: dir })
+    assert.equal(again.imported, 0)
+    assert.equal(again.nearDuplicates, 2)
+
+    // a live-captured play seconds away from an export entry is caught by the fuzzy window
+    recordHeard("2020-03-01T10:00:03Z", { uri: "spotify:track:gdpr1", name: "T", artists: [{ name: "A" }] })
+    const third = importHistory({ path: dir })
+    assert.equal(third.imported, 0)
+})
+
 // --- desired state ----------------------------------------------------------------
 
 test("desiredByMonth groups by berlin month and sets aside local files", () => {
