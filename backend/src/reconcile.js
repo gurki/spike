@@ -91,7 +91,7 @@ export function diffMonth(desired, actualUris) {
 
 // --- reconcile ------------------------------------------------------------
 
-export async function reconcile({ month = null, dryRun = false, prune = false, refresh = false } = {}) {
+export async function reconcile({ month = null, since = null, dryRun = false, prune = false, refresh = false } = {}) {
     const adapter = getAdapter(process.env.PROVIDER || "spotify")
     const db = getDb()
     const store = playlistStore(db)
@@ -103,6 +103,7 @@ export async function reconcile({ month = null, dryRun = false, prune = false, r
     // months with likes plus monthly-named playlists that exist anyway
     const months = [...new Set([...desired.keys(), ...monthlies.keys()])]
         .filter((m) => !month || m === month)
+        .filter((m) => !since || m >= since)
         .sort()
 
     const report = []

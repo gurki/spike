@@ -51,6 +51,7 @@ app.post("/ops/sync-likes", opHandler(() => () => syncLikes()))
 
 app.post("/ops/reconcile", opHandler((req) => () => reconcile({
     month: req.query.month || null,
+    since: req.query.since || null,
     dryRun: flag(req.query["dry-run"]),
     prune: flag(req.query.prune),
     refresh: flag(req.query.refresh),

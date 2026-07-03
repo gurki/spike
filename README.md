@@ -1,6 +1,11 @@
 # spike 🦔
 a spotify **watchdog** and **database** for **likes ❤️** and track **history ⏳**.
 
+spike watches your spotify account, records every like and play as an event in
+a local sqlite database, keeps monthly playlists (`YYYY-MM`) in sync with your
+liked songs, and can rebuild its entire database from the spotify api at any
+time. the database is the journal; spotify is the source of truth.
+
 ## Setup
 create an app for the spotify [Web API](https://developer.spotify.com/documentation/web-api) on your spotify developer dashboard
 
@@ -10,7 +15,7 @@ App Description: watchdog for likes ❤️ and track history ⏳
 Redirect URI:    http://127.0.0.1:8888/callback
 ```
 
-copy `/backend/.env.example` file to `/backend/.env`, add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization) (client ID and client secret), and define settings.
+copy `/backend/.env.example` to `/backend/.env` and add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization).
 
 ```env
 PORT=8888
@@ -20,68 +25,130 @@ CLIENT_SECRET="YOUR_SPOTIFY_CLIENT_SECRET"
 
 LIKES_INTERVAL_S=60
 HISTORY_INTERVAL_S=60
-
-LIKES_LIMIT=10
-HISTORY_LIMIT=10
-
-# refetch all of `liked.json` and `playlists.json` on start
-STARTUP_FETCH_ALL=true
 ```
 
-## Build & run (Docker)
+## Run (Docker, recommended for the server)
 
 ```sh
 cd backend
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
-## Build & run (bare metal)
+the `backend/db` directory (sqlite database, artwork, auth tokens) is
+bind-mounted and persists across rebuilds. deploying an update is
+`git pull && docker compose up -d --build`.
+
+## Run (bare metal)
+
+executed with [bun](https://bun.sh); the code itself uses standard node APIs.
 
 ```sh
 cd backend
-yarn
-yarn dev
+bun install
+bun index.js        # or: bun --watch index.js for development
 ```
 
-using pm2.
-
-```sh
-cd backend
-pm2 start index.js --name "spike"
-```
+a systemd unit for running without docker is in `deploy/spike.service`.
 
 ## Authorization
 
-login & create auth token at http://localhost:8888/login
+log in once at http://127.0.0.1:8888/login. tokens are stored in
+`backend/db/auth.json` and refreshed automatically.
 
-## Overview
-everything is stored **locally**.
-the database lives as **files** in `backend/db`.
+## Commands
 
-- `auth.json`: persistent spotify api [access tokens](https://developer.spotify.com/documentation/web-api/tutorials/code-flow)
-- `liked.json`: list of all [saved tracks](https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks)
-- `playlists.json`: list of all [playlists](https://developer.spotify.com/documentation/web-api/reference/get-playlist)
-- `history.csv`: history of [tracks](https://developer.spotify.com/documentation/web-api/reference/get-recently-played) since start
+the running daemon is the single executor; the `spike` cli is a thin http
+client (`SPIKE_URL` to target a remote instance, default `http://127.0.0.1:8888`).
 
-the **history** is saved in the following csv format.
-
-```csv
-startedAt,trackUri,contextUri
+```sh
+bun cli.js sync-likes         # rebuild/refresh all likes from the spotify api
+bun cli.js reconcile --dry-run          # per-month drift report, no changes
+bun cli.js reconcile --since 2026-04    # add missing likes to monthly playlists
+bun cli.js reconcile --month 2026-05    # single month
+bun cli.js reconcile --prune            # also remove non-liked extras (default: keep)
+bun cli.js verify             # consistency + integrity checks, exit 2 on drift
+bun cli.js hydrate            # backfill track metadata + album artwork
+bun cli.js stats              # totals, likes per month, top artists
+bun cli.js events --month 2026-06 --kind saved
 ```
 
-### Observer
-the **observer** runs queries every `*_INTERVAL_S` seconds. it fetches the last `*_LIMIT` entries.
+remote example from another machine on the LAN:
 
-newly discovered **saved tracks** are automatically added to the according monthly playlist `YYYY-mm`, based on their `added_at` field. if the playlist doesn't exist, it will be created first.
+```sh
+SPIKE_URL=http://nuc:8888 bun cli.js verify
+```
 
-newly discovered **recently played tracks** are automatically appended to the **history**.
+or plain http: `curl -X POST http://nuc:8888/ops/sync-likes`.
 
-### Docker volumes
+a nightly consistency check via cron:
 
-the storage directory `backend/db` is bind-mounted into the container, so all database files are persistent.
+```cron
+15 4 * * * curl -sf -X POST http://127.0.0.1:8888/ops/verify | grep -q '"ok":true' || echo "spike drift" | mail -s spike you@example.com
+```
+
+## How it works
+
+### Reconciliation, not bookkeeping
+
+monthly playlists are kept in sync by comparing **desired state** (liked
+tracks grouped by the calendar month of `added_at`, Europe/Berlin time)
+against **actual state** (the real playlist contents) and adding whatever is
+missing. catching up on missed months, healing drift, and live operation are
+all the same code path. reconcile is **additive-only**: tracks you removed
+from a playlist by hand, or unliked later, are reported but never touched
+(`--prune` opts into exact matching per run).
+
+### Events
+
+every observation is an event row with a **deterministic id** derived from
+its natural key (`provider|kind|timestamp|track`), so re-running any sync or
+rebuilding the database from scratch never creates duplicates:
+
+- `saved` - a like, timestamped with spotify's `added_at`
+- `heard` - a play from recently-played, timestamped with `played_at`
+- `playlist-added` - a track landing in a monthly playlist (also backfilled
+  from spotify's own `added_at` when playlists are scanned)
+
+### Rebuild from the source of truth
+
+`sync-likes` refetches the entire library; deterministic ids make it
+idempotent. delete `db/spike.db` and everything except play history is fully
+reconstructed from the api. **limitation:** spotify only exposes the last ~50
+recently-played tracks, so `heard` history is live-capture only - keep the
+daemon running.
+
+### Watchers
+
+the daemon polls likes and recently-played every `*_INTERVAL_S` seconds,
+records events, and triggers a debounced reconcile of the affected month.
+watcher cursors persist in the database, so likes during downtime are picked
+up on the next poll or `sync-likes`.
+
+### Artwork
+
+`hydrate` downloads each album's cover (largest size) once into a
+content-addressed store (`db/artwork/sha256/<aa>/<hash>`) and links tracks to
+it - ready to be pushed as blobs to a future journey server.
 
 ## Endpoints
-- `/login` - connect to spotify
-- `/user` - current user info
-- `/fetch/liked` - query and replace all saved tracks (`liked.json`)
-- `/fetch/playlists` - query and replace all playlists (`playlists.json`)
+
+- `GET /healthz` - liveness
+- `GET /stats` - totals, likes per month, top artists, last sync times
+- `GET /events?month=&kind=&limit=` - event log
+- `POST /ops/sync-likes | /ops/reconcile | /ops/verify` - operations (query
+  params: `dry-run`, `prune`, `month`, `since`, `strict`, `deep`)
+- `POST /ops/hydrate` + `GET /ops/jobs/:id` - long-running hydration
+- `GET /login`, `GET /callback` - spotify oauth
+
+## Storage
+
+everything lives in `backend/db`:
+
+- `spike.db` - sqlite database (tracks, events, playlist cache, sync state)
+- `artwork/` - content-addressed album covers
+- `auth.json` - spotify oauth tokens
+- `liked.json`, `playlists.json`, `history.csv` - legacy files from the
+  pre-sqlite era, kept untouched; not read by the current code
+
+sqlite driver: `bun:sqlite` under bun, `better-sqlite3` under node ≥ 18 - the
+single runtime-specific module is `src/db/driver.js`.

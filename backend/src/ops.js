@@ -59,9 +59,9 @@ export async function syncLikes() {
 
 // Reconcile monthly playlists against liked songs. Runs a full likes sync
 // first by default so the desired state is fresh.
-export async function reconcile({ month, dryRun, prune, refresh, sync = true } = {}) {
+export async function reconcile({ month, since, dryRun, prune, refresh, sync = true } = {}) {
     if (sync) await syncLikes()
-    return reconcileImpl({ month, dryRun, prune, refresh })
+    return reconcileImpl({ month, since, dryRun, prune, refresh })
 }
 
 export async function verify(flags = {}) {
