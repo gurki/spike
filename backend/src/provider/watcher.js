@@ -60,7 +60,7 @@ export class HistoryWatcher extends TrackWatcher {
         this.after = Date.parse(items[items.length - 1].played_at)
 
         for (const item of items) {
-            this.emit("heard", {
+            this.emit("listen", {
                 playedAt: item.played_at,
                 track: item.track,
                 context: item.context ? { type: item.context.type, uri: item.context.uri } : null,

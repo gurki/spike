@@ -4,10 +4,10 @@ import assert from "node:assert/strict"
 process.env.SPIKE_DB_PATH = ":memory:"
 
 const { localMonth } = await import("../src/time.js")
-const { deterministicUlid, savedKey, heardKey } = await import("../src/ids.js")
+const { deterministicUlid, savedKey, listenKey } = await import("../src/ids.js")
 const { canonicalUri } = await import("../src/canonical.js")
 const { diffMonth, desiredByMonth } = await import("../src/reconcile.js")
-const { recordSaved, recordHeard, recordAllSaved, trackRow } = await import("../src/eventstore.js")
+const { recordSaved, recordListen, recordAllSaved, trackRow } = await import("../src/eventstore.js")
 const { getDb } = await import("../src/db/init.js")
 
 // --- month bucketing (Europe/Berlin) ---------------------------------------
@@ -39,7 +39,7 @@ test("deterministic ulid: stable, valid, time-ordered", () => {
 
 test("natural keys use verbatim timestamps", () => {
     assert.equal(savedKey("2023-10-15T16:33:17Z", "u"), "spotify|saved|2023-10-15T16:33:17Z|u")
-    assert.equal(heardKey("2023-10-15T17:06:50.427Z", "u"), "spotify|2023-10-15T17:06:50.427Z|u")
+    assert.equal(listenKey("2023-10-15T17:06:50.427Z", "u"), "spotify|2023-10-15T17:06:50.427Z|u")
 })
 
 // --- relinking canonicalization ----------------------------------------------
@@ -101,8 +101,8 @@ test("recordAllSaved bulk rebuild is idempotent", () => {
 
 test("heard events dedupe on played_at", () => {
     const track = { uri: "spotify:track:heard", name: "H", artists: [{ name: "B" }] }
-    assert.equal(recordHeard("2024-07-04T08:00:00.123Z", track, { type: "album", uri: "spotify:album:1" }).inserted, true)
-    assert.equal(recordHeard("2024-07-04T08:00:00.123Z", track).inserted, false)
+    assert.equal(recordListen("2024-07-04T08:00:00.123Z", track, { type: "album", uri: "spotify:album:1" }).inserted, true)
+    assert.equal(recordListen("2024-07-04T08:00:00.123Z", track).inserted, false)
 })
 
 // --- artwork store -----------------------------------------------------------------
@@ -145,7 +145,7 @@ test("importHistory: filters, fuzzy dedupe, idempotence", async () => {
     assert.equal(again.nearDuplicates, 2)
 
     // a live-captured play seconds away from an export entry is caught by the fuzzy window
-    recordHeard("2020-03-01T10:00:03Z", { uri: "spotify:track:gdpr1", name: "T", artists: [{ name: "A" }] })
+    recordListen("2020-03-01T10:00:03Z", { uri: "spotify:track:gdpr1", name: "T", artists: [{ name: "A" }] })
     const third = importHistory({ path: dir })
     assert.equal(third.imported, 0)
 })

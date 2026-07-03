@@ -141,7 +141,7 @@ const commands = {
     "stats": async (flags) => {
         const { body } = await call("GET", "/stats", flags)
         if (flags.json) return console.log(JSON.stringify(body, null, 2)) ?? 0
-        console.log(`tracks ${body.totals.tracks} · saved ${body.totals.saved} · heard ${body.totals.heard}` +
+        console.log(`tracks ${body.totals.tracks} · saved ${body.totals.saved} · listens ${body.totals.listens}` +
             ` · playlist-added ${body.totals.playlistAdded}`)
         console.log(`last full sync: ${body.lastFullLikesSync ?? "never"} · last reconcile: ${body.lastReconcile ?? "never"}\n`)
         printTable(body.likesPerMonth, ["month", "likes"])

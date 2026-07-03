@@ -93,7 +93,7 @@ export const BROWSE_HTML = `<!doctype html>
                 ? '<img loading="lazy" src="/artwork/' + t.artwork_sha256 + '" alt="">'
                 : '<div class="noart">♪</div>'
             const saved = t.saved_at ? t.saved_at.slice(0, 10) : "–"
-            const heard = t.heard_count ? " · ♫ " + t.heard_count : ""
+            const heard = t.listen_count ? " · ♫ " + t.listen_count : ""
             const id = t.uri.startsWith("spotify:track:") ? t.uri.split(":")[2] : null
             const open = id ? ' href="https://open.spotify.com/track/' + id + '" target="_blank" rel="noopener"' : ""
             return '<a class="card"' + open + '>' + art +

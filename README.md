@@ -112,7 +112,7 @@ its natural key (`provider|kind|timestamp|track`), so re-running any sync or
 rebuilding the database from scratch never creates duplicates:
 
 - `saved` - a like, timestamped with spotify's `added_at`
-- `heard` - a play from recently-played, timestamped with `played_at`
+- `listen` - a play from recently-played, timestamped with `played_at`
 - `playlist-added` - a track landing in a monthly playlist (also backfilled
   from spotify's own `added_at` when playlists are scanned)
 
@@ -121,7 +121,7 @@ rebuilding the database from scratch never creates duplicates:
 `sync-likes` refetches the entire library; deterministic ids make it
 idempotent. delete `db/spike.db` and everything except play history is fully
 reconstructed from the api. **limitation:** spotify only exposes the last ~50
-recently-played tracks, so `heard` history is live-capture only - keep the
+recently-played tracks, so `listen` history is live-capture only - keep the
 daemon running.
 
 the one exception: your **full lifetime play history** can be rebuilt from
@@ -156,13 +156,16 @@ its normal sync api:
 - tracks become `music.track` items (deterministic ids from the provider
   uri), with album artwork uploaded as content-addressed blobs and attached
   with role `artwork`
-- `heard` events become `music.listen` items, `saved` and `playlist-added`
+- `listen` events become `music.listen` items, `saved` and `playlist-added`
   events become `music.library_event` items - reusing the event ids, which
   are already journey-style deterministic ulids
 
 pushes are cursor-based (only new rows) and idempotent (`--full` re-pushes
-everything; the server absorbs duplicates). spike stays the source of its
-own working state; journey is the archive.
+everything; the server absorbs duplicates). the daemon also pushes
+automatically: any new listen, like, or playlist add triggers a debounced
+journey sync ~10s later, and failures retry on the next change since the
+cursor only advances after a clean push. spike stays the source of its own
+working state; journey is the archive.
 
 ### Artwork
 

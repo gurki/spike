@@ -7,7 +7,7 @@ dotenv.config()
 import Auth from "./src/auth.js"
 import "./src/provider/spotify.js"
 import { LikesWatcher, HistoryWatcher } from "./src/provider/watcher.js"
-import { recordSaved, recordHeard, getSyncState, setSyncState } from "./src/eventstore.js"
+import { recordSaved, recordListen, getSyncState, setSyncState } from "./src/eventstore.js"
 import { withLock, getJob, syncLikes, reconcile, verify, importHistory, journeySync, startHydrate } from "./src/ops.js"
 import { getStats, getEvents, getTracks, getPlaylists, getArtwork } from "./src/queries.js"
 import { BROWSE_HTML } from "./src/browse.js"
@@ -57,10 +57,11 @@ app.get("/browse", (req, res) => {
 
 const flag = (value) => value === "" || value === "true" || value === "1" || value === true
 
-function opHandler(fn) {
+function opHandler(fn, { autoSync = false } = {}) {
     return async (req, res) => {
         try {
             res.json(await withLock(fn(req)))
+            if (autoSync) scheduleJourneySync()
         } catch (error) {
             console.error("❌ op failed:", error)
             res.status(500).json({ error: error.message })
@@ -68,7 +69,7 @@ function opHandler(fn) {
     }
 }
 
-app.post("/ops/sync-likes", opHandler(() => () => syncLikes()))
+app.post("/ops/sync-likes", opHandler(() => () => syncLikes(), { autoSync: true }))
 
 app.post("/ops/reconcile", opHandler((req) => () => reconcile({
     month: req.query.month || null,
@@ -77,7 +78,7 @@ app.post("/ops/reconcile", opHandler((req) => () => reconcile({
     prune: flag(req.query.prune),
     refresh: flag(req.query.refresh),
     includeBulk: flag(req.query["include-bulk"]),
-})))
+}), { autoSync: true }))
 
 app.post("/ops/verify", opHandler((req) => () => verify({
     strict: flag(req.query.strict),
@@ -87,7 +88,7 @@ app.post("/ops/verify", opHandler((req) => () => verify({
 app.post("/ops/import-history", opHandler((req) => () => importHistory({
     path: req.query.path,
     minMs: req.query["min-ms"] ? Number(req.query["min-ms"]) : undefined,
-})))
+}), { autoSync: true }))
 
 app.post("/ops/journey-sync", opHandler((req) => () => journeySync({
     full: flag(req.query.full),
@@ -110,10 +111,30 @@ const historyWatcher = new HistoryWatcher()
 let reconcileTimer = null
 const pendingMonths = new Set()
 
+// auto-push to the journey server after any change (new listen, like,
+// playlist add). debounced; failures are retried on the next trigger since
+// the cursor only advances after a clean push.
+let journeyTimer = null
+
+function scheduleJourneySync() {
+    if (!process.env.JOURNEY_TOKEN || !process.env.JOURNEY_CLIENT_ID) return
+    clearTimeout(journeyTimer)
+    journeyTimer = setTimeout(() => {
+        withLock(() => journeySync())
+            .then((result) => {
+                if (result.tracks || result.events) {
+                    console.log(`🛰️ journey: pushed ${result.tracks} tracks, ${result.events} events`)
+                }
+            })
+            .catch((error) => console.error("❌ journey sync failed:", error.message))
+    }, 10_000)
+}
+
 likesWatcher.on("saved", ({ addedAt, track }) => {
     const { inserted } = recordSaved(addedAt, track)
     if (!inserted) return
     setSyncState("likes_cursor", Date.parse(addedAt))
+    scheduleJourneySync()
 
     // debounce: batch likes arriving together into one reconcile per month
     pendingMonths.add(localMonth(addedAt))
@@ -124,6 +145,7 @@ likesWatcher.on("saved", ({ addedAt, track }) => {
                 .then((result) => {
                     const applied = result.applied?.added ?? 0
                     if (applied) console.log(`✅ reconciled ${month}: ${applied} added`)
+                    scheduleJourneySync() // reconcile records playlist-added events
                 })
                 .catch((error) => console.error("❌ watcher reconcile failed:", error.message))
         }
@@ -131,9 +153,11 @@ likesWatcher.on("saved", ({ addedAt, track }) => {
     }, 5000)
 })
 
-historyWatcher.on("heard", ({ playedAt, track, context }) => {
-    const { inserted } = recordHeard(playedAt, track, context)
-    if (inserted) setSyncState("history_cursor", Date.parse(playedAt))
+historyWatcher.on("listen", ({ playedAt, track, context }) => {
+    const { inserted } = recordListen(playedAt, track, context)
+    if (!inserted) return
+    setSyncState("history_cursor", Date.parse(playedAt))
+    scheduleJourneySync()
 })
 
 // --- lifecycle --------------------------------------------------------------
@@ -161,6 +185,7 @@ const server = app.listen(PORT, async () => {
 function shutdown() {
     console.log("👋 shutting down ...")
     clearTimeout(reconcileTimer)
+    clearTimeout(journeyTimer)
     server.close(() => {
         closeDb()
         process.exit(0)

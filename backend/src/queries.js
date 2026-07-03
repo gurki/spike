@@ -8,7 +8,7 @@ export function getStats() {
         SELECT
             (SELECT COUNT(*) FROM tracks) AS tracks,
             (SELECT COUNT(*) FROM events WHERE kind = 'saved') AS saved,
-            (SELECT COUNT(*) FROM events WHERE kind = 'heard') AS heard,
+            (SELECT COUNT(*) FROM events WHERE kind = 'listen') AS listens,
             (SELECT COUNT(*) FROM events WHERE kind = 'playlist-added') AS playlistAdded
     `).get()
 
@@ -44,7 +44,7 @@ export function getTracks({ q = null, month = null, playlist = null, limit = 100
             SELECT t.uri, t.title, t.artists, t.album_name, t.album_release_date,
                    t.duration_ms, t.explicit, t.is_local, t.artwork_sha256,
                    pi.added_at AS saved_at,
-                   (SELECT COUNT(*) FROM events e WHERE e.track_uri = t.uri AND e.kind = 'heard') AS heard_count
+                   (SELECT COUNT(*) FROM events e WHERE e.track_uri = t.uri AND e.kind = 'listen') AS listen_count
             FROM playlist_items pi
             JOIN playlists p ON p.uri = pi.playlist_uri
             JOIN tracks t ON t.uri = pi.track_uri
@@ -61,7 +61,7 @@ export function getTracks({ q = null, month = null, playlist = null, limit = 100
         SELECT t.uri, t.title, t.artists, t.album_name, t.album_release_date,
                t.duration_ms, t.explicit, t.is_local, t.artwork_sha256,
                MIN(CASE WHEN e.kind = 'saved' THEN e.triggered_at END) AS saved_at,
-               COUNT(CASE WHEN e.kind = 'heard' THEN 1 END) AS heard_count
+               COUNT(CASE WHEN e.kind = 'listen' THEN 1 END) AS listen_count
         FROM tracks t
         LEFT JOIN events e ON e.track_uri = t.uri
         WHERE (@like IS NULL OR t.title LIKE @like OR t.artists LIKE @like OR t.album_name LIKE @like)

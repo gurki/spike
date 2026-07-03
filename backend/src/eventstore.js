@@ -1,7 +1,7 @@
 import { getDb } from "./db/init.js"
 import { canonicalUri } from "./canonical.js"
 import { localMonth } from "./time.js"
-import { deterministicUlid, savedKey, heardKey, playlistAddedKey } from "./ids.js"
+import { deterministicUlid, savedKey, listenKey, playlistAddedKey } from "./ids.js"
 
 let statements = null
 
@@ -111,12 +111,12 @@ export function recordSaved(addedAt, rawTrack) {
     return { uri, inserted }
 }
 
-export function recordHeard(playedAt, rawTrack, context = null) {
+export function recordListen(playedAt, rawTrack, context = null) {
     const stmts = prepare()
     const uri = upsertTrack(rawTrack)
     const inserted = insertEvent(stmts, {
-        kind: "heard",
-        naturalKey: heardKey(playedAt, uri),
+        kind: "listen",
+        naturalKey: listenKey(playedAt, uri),
         trackUri: uri,
         triggeredAt: playedAt,
         contextType: context?.type ?? null,

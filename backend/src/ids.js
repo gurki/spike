@@ -38,5 +38,5 @@ export function entityUlid(naturalKey) {
 // Natural keys use the provider timestamp VERBATIM as returned by the API,
 // never a normalized or derived value - see architecture/core/longevity.md.
 export const savedKey = (addedAt, uri) => `spotify|saved|${addedAt}|${uri}`
-export const heardKey = (playedAt, uri) => `spotify|${playedAt}|${uri}`
+export const listenKey = (playedAt, uri) => `spotify|${playedAt}|${uri}`
 export const playlistAddedKey = (addedAt, uri) => `spotify|playlist-added|${addedAt}|${uri}`

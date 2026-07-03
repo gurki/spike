@@ -89,7 +89,7 @@ function eventItem(event, track, playlistName, clientId) {
         source: source(clientId),
     }
 
-    if (event.kind === "heard") {
+    if (event.kind === "listen") {
         const startedAt = track.duration_ms
             ? new Date(Date.parse(ts) - track.duration_ms).toISOString()
             : ts
@@ -113,7 +113,7 @@ function eventItem(event, track, playlistName, clientId) {
 
     // saved / playlist-added -> music.library_event
     const data = {
-        event: event.kind === "heard" ? undefined : event.kind,
+        event: event.kind,
         provider: "spotify",
         track: trackRef,
     }

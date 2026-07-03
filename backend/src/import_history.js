@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 import { getDb } from "./db/init.js"
-import { recordHeard, setSyncState } from "./eventstore.js"
+import { recordListen, setSyncState } from "./eventstore.js"
 
 // Import a Spotify GDPR "extended streaming history" export - the only source
 // for plays older than the api's ~50-item recently-played window. Entries
@@ -28,7 +28,7 @@ export function importHistory({ path, minMs = 30_000 } = {}) {
     const db = getDb()
     const nearDuplicate = db.prepare(`
         SELECT 1 FROM events
-        WHERE kind = 'heard' AND track_uri = @uri
+        WHERE kind = 'listen' AND track_uri = @uri
           AND datetime(triggered_at) BETWEEN datetime(@ts, '-120 seconds') AND datetime(@ts, '+120 seconds')
         LIMIT 1
     `)
@@ -65,7 +65,7 @@ export function importHistory({ path, minMs = 30_000 } = {}) {
                         : undefined,
                 }
 
-                const { inserted } = recordHeard(ts, track, null)
+                const { inserted } = recordListen(ts, track, null)
                 if (inserted) result.imported++
             }
         })()
