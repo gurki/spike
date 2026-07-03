@@ -1,77 +1,69 @@
 import { EventEmitter } from "node:events"
 import { getAdapter } from "./adapter.js"
 
-export class TrackWatcher extends EventEmitter {
-    constructor(name, interval, limit) {
+// Watchers poll the provider and emit raw items with VERBATIM provider
+// timestamps; the eventstore derives natural keys and month buckets from
+// them. Cursors are epoch ms, persisted by the daemon in sync_state.
+
+class TrackWatcher extends EventEmitter {
+    constructor(name, intervalMs) {
         super()
         this.name = name
-        this.interval = interval
-        this.limit = limit
+        this.interval = intervalMs
         this.lastUpdate = 0
         this.provider = process.env.PROVIDER || "spotify"
+    }
+
+    due() {
+        if (Date.now() < this.lastUpdate + this.interval) return false
+        this.lastUpdate = Date.now()
+        return true
     }
 }
 
 export class LikesWatcher extends TrackWatcher {
-    constructor(name = "likes") {
-        const interval = (process.env.LIKES_INTERVAL_S || 60) * 1000
-        const limit = process.env.LIKES_LIMIT || 10
-        super(name, interval, limit)
+    constructor() {
+        super("likes", (Number(process.env.LIKES_INTERVAL_S) || 60) * 1000)
         this.latest = Date.now()
     }
 
     async update() {
-        if (Date.now() < this.lastUpdate + this.interval) return
-        this.lastUpdate = Date.now()
+        if (!this.due()) return
 
         const adapter = getAdapter(this.provider)
-        const items = await adapter.fetchLikes?.(this.latest)
-        if (!items || items.length === 0) return
+        const items = await adapter.fetchLikes(this.latest)
+        if (items.length === 0) return
 
-        items.sort((a, b) => (a._added_at ?? 0) - (b._added_at ?? 0))
-        this.latest = items[items.length - 1]._added_at
+        items.sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
+        this.latest = Date.parse(items[items.length - 1].added_at)
 
         for (const item of items) {
-            this.emit("trackAdded", {
-                kind: "liked",
-                trackUri: item.uri,
-                context: { type: "saved", _month: new Date(item._added_at).toISOString().substring(0, 7) },
-                provider: this.provider,
-                rawSnapshot: item,
-            })
+            this.emit("saved", { addedAt: item.added_at, track: item.track })
         }
     }
 }
 
 export class HistoryWatcher extends TrackWatcher {
-    constructor(name = "history") {
-        const interval = (process.env.HISTORY_INTERVAL_S || 60) * 1000
-        const limit = process.env.HISTORY_LIMIT || 10
-        super(name, interval, limit)
+    constructor() {
+        super("history", (Number(process.env.HISTORY_INTERVAL_S) || 60) * 1000)
         this.after = 0
     }
 
     async update() {
-        if (Date.now() < this.lastUpdate + this.interval) return
-        this.lastUpdate = Date.now()
+        if (!this.due()) return
 
         const adapter = getAdapter(this.provider)
-        const result = await adapter.fetchHistory?.(this.after)
-        const items = result?.items ?? []
+        const items = await adapter.fetchHistory(this.after)
         if (items.length === 0) return
 
-        items.sort((a, b) => (a._played_at ?? 0) - (b._played_at ?? 0))
-        this.after = items[items.length - 1]._played_at
+        items.sort((a, b) => Date.parse(a.played_at) - Date.parse(b.played_at))
+        this.after = Date.parse(items[items.length - 1].played_at)
 
         for (const item of items) {
-            this.emit("trackAdded", {
-                kind: "heard",
-                trackUri: item.uri,
-                context: item.context
-                    ? { type: item.context.type, uri: item.context.uri }
-                    : { type: "player" },
-                provider: this.provider,
-                rawSnapshot: item,
+            this.emit("heard", {
+                playedAt: item.played_at,
+                track: item.track,
+                context: item.context ? { type: item.context.type, uri: item.context.uri } : null,
             })
         }
     }

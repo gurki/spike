@@ -1,115 +1,165 @@
 import { getDb } from "./db/init.js"
-import { randomUUID } from "crypto"
+import { canonicalUri } from "./canonical.js"
+import { localMonth } from "./time.js"
+import { deterministicUlid, savedKey, heardKey, playlistAddedKey } from "./ids.js"
 
-const db = getDb()
+let statements = null
 
-const prepUpsTrack = db.prepare(`
-    INSERT INTO tracks (id, uri, title, artists, album, release_date, duration_ms, external_refs)
-    VALUES (@id, @uri, @title, @artists, @album, @release_date, @duration_ms, @external_refs)
-    ON CONFLICT(uri) DO UPDATE SET
-        title = COALESCE(excluded.title, title),
-        artists = COALESCE(excluded.artists, artists),
-        album = COALESCE(excluded.album, album),
-        release_date = COALESCE(excluded.release_date, release_date),
-        duration_ms = COALESCE(excluded.duration_ms, duration_ms),
-        external_refs = COALESCE(excluded.external_refs, external_refs)
-    RETURNING *
-`).run
+function prepare() {
+    if (statements) return statements
+    const db = getDb()
 
-const prepInsEvent = db.prepare(`
-    INSERT INTO events (id, kind, track_id, triggered_at, context_type, context_uri, provider, raw_snapshot)
-    VALUES (@id, @kind, @track_id, @triggered_at, @context_type, @context_uri, @provider, @raw_snapshot)
-`).run
+    statements = {
+        db,
 
-const prepSelTrackByUri = db.prepare(`SELECT * FROM tracks WHERE uri = ?`).get
+        upsertTrack: db.prepare(`
+            INSERT INTO tracks (
+                uri, title, artists, album_name, album_type, album_total_tracks,
+                album_release_date, duration_ms, isrc, explicit, track_number,
+                disc_number, is_local
+            ) VALUES (
+                @uri, @title, @artists, @album_name, @album_type, @album_total_tracks,
+                @album_release_date, @duration_ms, @isrc, @explicit, @track_number,
+                @disc_number, @is_local
+            )
+            ON CONFLICT(uri) DO UPDATE SET
+                title = COALESCE(excluded.title, title),
+                artists = COALESCE(excluded.artists, artists),
+                album_name = COALESCE(excluded.album_name, album_name),
+                album_type = COALESCE(excluded.album_type, album_type),
+                album_total_tracks = COALESCE(excluded.album_total_tracks, album_total_tracks),
+                album_release_date = COALESCE(excluded.album_release_date, album_release_date),
+                duration_ms = COALESCE(excluded.duration_ms, duration_ms),
+                isrc = COALESCE(excluded.isrc, isrc),
+                explicit = COALESCE(excluded.explicit, explicit),
+                track_number = COALESCE(excluded.track_number, track_number),
+                disc_number = COALESCE(excluded.disc_number, disc_number)
+        `),
 
-export function upsertTrack( trackUri, snapshot ) {
-    const raw = typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
-    const track = raw.track ?? raw
+        insertEvent: db.prepare(`
+            INSERT OR IGNORE INTO events (
+                id, natural_key, kind, track_uri, triggered_at, month,
+                context_type, context_uri, provider, raw_snapshot
+            ) VALUES (
+                @id, @natural_key, @kind, @track_uri, @triggered_at, @month,
+                @context_type, @context_uri, @provider, @raw_snapshot
+            )
+        `),
 
-    const title = track.name ?? track.title ?? null
-    const artists = track.artists ? JSON.stringify(track.artists.map(a => a.name ?? a)) : null
-    const album = track.album?.name ?? null
-    const release_date = track.album?.release_date ?? null
-    const duration_ms = track.duration_ms ?? null
+        trackExists: db.prepare("SELECT 1 FROM tracks WHERE uri = ?"),
+        insertTrackStub: db.prepare("INSERT OR IGNORE INTO tracks (uri, is_local) VALUES (?, ?)"),
+    }
 
-    const externalRefs = {}
-    if (track.external_urls?.spotify) externalRefs.spotify = track.external_urls.spotify
-    if (track.external_ids?.isrc) externalRefs.isrc = track.external_ids.isrc
-    if (track.uri) externalRefs.uri = track.uri
-    if (track.id) externalRefs.spotId = track.id
-
-    return prepUpsTrack({
-        id: randomUUID(),
-        uri: trackUri,
-        title,
-        artists,
-        album,
-        release_date,
-        duration_ms,
-        external_refs: JSON.stringify(externalRefs),
-    })
+    return statements
 }
 
-export function storeEvent(kind, trackUri, context, provider, rawSnapshot) {
-    const existing = prepSelTrackByUri.get(trackUri)
-    if (!existing) {
-        upsertTrack(trackUri, rawSnapshot)
+// Map a raw Spotify track object onto stable fields only. Volatile provider
+// fields (popularity, available_markets, preview_url) are excluded by design.
+export function trackRow(rawTrack) {
+    return {
+        uri: canonicalUri(rawTrack),
+        title: rawTrack.name ?? null,
+        artists: rawTrack.artists ? JSON.stringify(rawTrack.artists.map((a) => a.name)) : null,
+        album_name: rawTrack.album?.name ?? null,
+        album_type: rawTrack.album?.album_type ?? null,
+        album_total_tracks: rawTrack.album?.total_tracks ?? null,
+        album_release_date: rawTrack.album?.release_date ?? null,
+        duration_ms: rawTrack.duration_ms ?? null,
+        isrc: rawTrack.external_ids?.isrc ?? null,
+        explicit: rawTrack.explicit == null ? null : Number(rawTrack.explicit),
+        track_number: rawTrack.track_number ?? null,
+        disc_number: rawTrack.disc_number ?? null,
+        is_local: Number(Boolean(rawTrack.is_local)),
     }
+}
 
-    const track = prepSelTrackByUri.get(trackUri)
-    if (!track) {
-        throw new Error(`Failed to resolve track for URI: ${trackUri}`)
-    }
+export function upsertTrack(rawTrack) {
+    const stmts = prepare()
+    const row = trackRow(rawTrack)
+    if (!row.uri) throw new Error("track has no uri")
+    stmts.upsertTrack.run(row)
+    return row.uri
+}
 
-    const raw = rawSnapshot
-        ? (typeof rawSnapshot === 'string' ? rawSnapshot : JSON.stringify(rawSnapshot))
-        : null
-
-    const eventId = randomUUID()
-    prepInsEvent.run({
-        id: eventId,
+function insertEvent(stmts, { kind, naturalKey, trackUri, triggeredAt, contextType, contextUri, rawSnapshot }) {
+    const result = stmts.insertEvent.run({
+        id: deterministicUlid(triggeredAt, naturalKey),
+        natural_key: naturalKey,
         kind,
-        track_id: track.id,
-        triggered_at: new Date().toISOString(),
-        context_type: context?.type ?? null,
-        context_uri: context?.uri ?? null,
-        provider,
-        raw_snapshot: raw,
+        track_uri: trackUri,
+        triggered_at: triggeredAt,
+        month: localMonth(triggeredAt),
+        context_type: contextType ?? null,
+        context_uri: contextUri ?? null,
+        provider: "spotify",
+        raw_snapshot: rawSnapshot ? JSON.stringify(rawSnapshot) : null,
     })
-
-    return eventId
+    return result.changes > 0
 }
 
-const prepGetMonthly = db.prepare(`
-    SELECT t.title, t.artists, t.uri as track_uri, t.album, t.duration_ms, t.release_date, p.playlist_uri, p.playlist_name, e.triggered_at
-    FROM playlist_entries pe
-    JOIN tracks t ON pe.track_id = t.id
-    JOIN events e ON pe.source_event_id = e.id
-    JOIN playlists p ON pe.playlist_uri = p.uri
-    WHERE p.provider = ? AND pe.provider = ?
-    AND (strftime('%Y-%m', e.triggered_at) = ? OR strftime('%Y-%m', pe.created_at) = ?)
-    ORDER BY e.triggered_at DESC
-`).all
+// addedAt / playedAt are provider timestamps, VERBATIM - they are the id basis.
 
-export function getMonthlyTracks( month ) {
-    if (month.startsWith('spotify:playlist:monthly_')) {
-        const yearMonth = month.replace('spotify:playlist:monthly_', '')
-        return prepGetMonthly('local', 'local', yearMonth, yearMonth)
+export function recordSaved(addedAt, rawTrack) {
+    const stmts = prepare()
+    const uri = upsertTrack(rawTrack)
+    const inserted = insertEvent(stmts, {
+        kind: "saved",
+        naturalKey: savedKey(addedAt, uri),
+        trackUri: uri,
+        triggeredAt: addedAt,
+    })
+    return { uri, inserted }
+}
+
+export function recordHeard(playedAt, rawTrack, context = null) {
+    const stmts = prepare()
+    const uri = upsertTrack(rawTrack)
+    const inserted = insertEvent(stmts, {
+        kind: "heard",
+        naturalKey: heardKey(playedAt, uri),
+        trackUri: uri,
+        triggeredAt: playedAt,
+        contextType: context?.type ?? null,
+        contextUri: context?.uri ?? null,
+    })
+    return { uri, inserted }
+}
+
+export function recordPlaylistAdded(addedAt, trackUri, playlistUri) {
+    const stmts = prepare()
+    if (!stmts.trackExists.get(trackUri)) {
+        stmts.insertTrackStub.run(trackUri, Number(trackUri.startsWith("spotify:local:")))
     }
-    return prepGetMonthly('spotify', 'spotify', month, month)
+    const inserted = insertEvent(stmts, {
+        kind: "playlist-added",
+        naturalKey: playlistAddedKey(addedAt, trackUri),
+        trackUri,
+        triggeredAt: addedAt,
+        contextType: "playlist",
+        contextUri: playlistUri,
+    })
+    return { inserted }
 }
 
-const prepGetHistory = db.prepare(`
-    SELECT e.id, e.kind, e.triggered_at, e.context_type, e.context_uri, e.provider, e.raw_snapshot,
-           t.id as track_id, t.title, t.artists, t.album, t.uri as track_uri, t.release_date, t.duration_ms
-    FROM events e
-    JOIN tracks t ON e.track_id = t.id
-    WHERE e.kind = 'heard'
-    ORDER BY e.triggered_at DESC
-    LIMIT ?
-`).all
+// Bulk import of a full likes fetch inside one transaction.
+export function recordAllSaved(items) {
+    const stmts = prepare()
+    let inserted = 0
+    stmts.db.transaction(() => {
+        for (const item of items) {
+            if (recordSaved(item.added_at, item.track).inserted) inserted++
+        }
+    })()
+    return { total: items.length, inserted }
+}
 
-export function getHistory(limit = 50) {
-    return prepGetHistory.all(limit)
+export function getSyncState(key) {
+    return prepare().db.prepare("SELECT value FROM sync_state WHERE key = ?").get(key)?.value ?? null
+}
+
+export function setSyncState(key, value) {
+    prepare().db.prepare(`
+        INSERT INTO sync_state (key, value, updated_at) VALUES (?, ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(key, String(value))
 }

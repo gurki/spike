@@ -1,90 +1,140 @@
 import "./src/bugle.js"
-import { icons } from "./src/bugle.js"
-
-import Auth from "./src/auth.js"
-import Playlists from "./src/playlists.js"
-
-import { History } from "./src/history.js"
-import { HistoryWatcher, LikesWatcher } from "./src/watcher.js"
 
 import express from "express"
-import cors from "cors"
-
 import * as dotenv from "dotenv"
-dotenv.config();
+dotenv.config()
 
-const CLIENT_ID = process.env.CLIENT_ID || "n/a";
-const PORT = process.env.PORT || 8888;
+import Auth from "./src/auth.js"
+import "./src/provider/spotify.js"
+import { LikesWatcher, HistoryWatcher } from "./src/provider/watcher.js"
+import { recordSaved, recordHeard, getSyncState, setSyncState } from "./src/eventstore.js"
+import { withLock, getJob, syncLikes, reconcile, verify, startHydrate } from "./src/ops.js"
+import { getStats, getEvents } from "./src/queries.js"
+import { localMonth } from "./src/time.js"
+import { closeDb } from "./src/db/init.js"
 
-const app = express();
-app.use( cors() );
-app.use( "/", Auth.router );
+const PORT = Number(process.env.PORT) || 8888
+const app = express()
 
+app.use("/", Auth.router)
 
-app.get( "/user", async ( _, res ) => {
+// --- health + inspection --------------------------------------------------
 
-    const headers = Auth.getHeader();
-    const data = await fetch( "https://api.spotify.com/v1/me", { headers });
-    const user = await data.json();
-    console.log( user );
-    res.send( user );
+app.get("/healthz", (req, res) => {
+    res.json({ ok: true, uptime: process.uptime() })
+})
 
-});
+app.get("/stats", (req, res) => {
+    res.json(getStats())
+})
 
+app.get("/events", (req, res) => {
+    res.json(getEvents(req.query))
+})
 
-app.get( "/playlists", async ( _, res ) => {
-    const names = Playlists.playlists.map( p => p.name );
-    res.send( names );
-});
+// --- operations (the daemon is the single executor) -----------------------
 
+const flag = (value) => value === "" || value === "true" || value === "1" || value === true
 
-app.get( "/liked", async ( _, res ) => {
-    res.send( Liked.liked.length.toFixed() + " liked songs" );
-});
+function opHandler(fn) {
+    return async (req, res) => {
+        try {
+            res.json(await withLock(fn(req)))
+        } catch (error) {
+            console.error("❌ op failed:", error)
+            res.status(500).json({ error: error.message })
+        }
+    }
+}
 
+app.post("/ops/sync-likes", opHandler(() => () => syncLikes()))
 
-app.get( "/monthlies", async ( _, res ) => {
-    res.send( Object.keys( Playlists.monthlies ) );
-});
+app.post("/ops/reconcile", opHandler((req) => () => reconcile({
+    month: req.query.month || null,
+    dryRun: flag(req.query["dry-run"]),
+    prune: flag(req.query.prune),
+    refresh: flag(req.query.refresh),
+})))
 
+app.post("/ops/verify", opHandler((req) => () => verify({
+    strict: flag(req.query.strict),
+    deep: flag(req.query.deep),
+})))
 
-app.get( "/fetch/liked", async ( _, res ) => {
-    Liked.fetch();
-    res.sendStatus( 202 );
-});
+app.post("/ops/hydrate", (req, res) => {
+    res.status(202).json(startHydrate())
+})
 
+app.get("/ops/jobs/:id", (req, res) => {
+    const job = getJob(req.params.id)
+    if (!job) return res.status(404).json({ error: "job not found" })
+    res.json(job)
+})
 
-app.get( "/fetch/playlists", async ( _, res ) => {
-    Playlists.fetch();
-    res.sendStatus( 202 );
-});
+// --- watchers --------------------------------------------------------------
 
+const likesWatcher = new LikesWatcher()
+const historyWatcher = new HistoryWatcher()
+let reconcileTimer = null
+const pendingMonths = new Set()
 
-let history = new History();
-let historyWatcher = new HistoryWatcher();
-let likesWatcher = new LikesWatcher();
+likesWatcher.on("saved", ({ addedAt, track }) => {
+    const { inserted } = recordSaved(addedAt, track)
+    if (!inserted) return
+    setSyncState("likes_cursor", Date.parse(addedAt))
 
+    // debounce: batch likes arriving together into one reconcile per month
+    pendingMonths.add(localMonth(addedAt))
+    clearTimeout(reconcileTimer)
+    reconcileTimer = setTimeout(() => {
+        for (const month of pendingMonths) {
+            withLock(() => reconcile({ month, sync: false }))
+                .then((result) => {
+                    const applied = result.applied?.added ?? 0
+                    if (applied) console.log(`✅ reconciled ${month}: ${applied} added`)
+                })
+                .catch((error) => console.error("❌ watcher reconcile failed:", error.message))
+        }
+        pendingMonths.clear()
+    }, 5000)
+})
 
-app.listen( PORT, async () => {
+historyWatcher.on("heard", ({ playedAt, track, context }) => {
+    const { inserted } = recordHeard(playedAt, track, context)
+    if (inserted) setSyncState("history_cursor", Date.parse(playedAt))
+})
 
-    console.log( "🦔 spike listening on", PORT, "..." );
+// --- lifecycle --------------------------------------------------------------
 
-    const authenticated = await Auth.init();
+const server = app.listen(PORT, async () => {
+    console.log("🦔 spike listening on", PORT, "...")
 
-    if ( ! authenticated ) {
-        console.error( icons.failure, `authentication failed. 😢 visit http://127.0.0.1:${PORT}/login to log in 👋` );
-        return;
+    const authenticated = await Auth.init()
+    if (!authenticated) {
+        console.error(`❌ not authenticated - visit http://127.0.0.1:${PORT}/login 👋`)
+        return
     }
 
-    console.success( icons.request, `authenticated as ${CLIENT_ID}` );
+    likesWatcher.latest = Number(getSyncState("likes_cursor")) || Date.now()
+    historyWatcher.after = Number(getSyncState("history_cursor")) || 0
 
-    history.load();
-    historyWatcher.on( "trackAdded", item => history.append( item ) );
-    likesWatcher.on( "trackAdded", item => Playlists.addMonthly( item ) );
+    setInterval(() => {
+        likesWatcher.update().catch((error) => console.error("❌ likes watcher:", error.message))
+        historyWatcher.update().catch((error) => console.error("❌ history watcher:", error.message))
+    }, 10 * 1000)
 
-    setInterval( () => {
-        historyWatcher.update();
-        likesWatcher.update();
-    }, 10 * 1000 );
+    console.log("👂 watchers running")
+})
 
-});
+function shutdown() {
+    console.log("👋 shutting down ...")
+    clearTimeout(reconcileTimer)
+    server.close(() => {
+        closeDb()
+        process.exit(0)
+    })
+    setTimeout(() => process.exit(1), 5000).unref()
+}
+
+process.on("SIGINT", shutdown)
+process.on("SIGTERM", shutdown)
