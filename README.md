@@ -146,6 +146,24 @@ records events, and triggers a debounced reconcile of the affected month.
 watcher cursors persist in the database, so likes during downtime are picked
 up on the next poll or `sync-likes`.
 
+### Journey sync
+
+with `JOURNEY_URL`, `JOURNEY_TOKEN`, and `JOURNEY_CLIENT_ID` configured (a
+journey client with `write:music.*` scope), `journey-sync` pushes everything
+to a [journey server](../24w03-heros-path) as provider-agnostic items over
+its normal sync api:
+
+- tracks become `music.track` items (deterministic ids from the provider
+  uri), with album artwork uploaded as content-addressed blobs and attached
+  with role `artwork`
+- `heard` events become `music.listen` items, `saved` and `playlist-added`
+  events become `music.library_event` items - reusing the event ids, which
+  are already journey-style deterministic ulids
+
+pushes are cursor-based (only new rows) and idempotent (`--full` re-pushes
+everything; the server absorbs duplicates). spike stays the source of its
+own working state; journey is the archive.
+
 ### Artwork
 
 `hydrate` downloads each album's cover (largest size) once into a

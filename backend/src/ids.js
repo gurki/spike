@@ -28,6 +28,13 @@ export function deterministicUlid(triggeredAt, naturalKey) {
     return crockfordBase32(bytes)
 }
 
+// Entities (tracks) have no event time; all 128 bits come from the hash so
+// the id is recomputable from the natural key alone.
+export function entityUlid(naturalKey) {
+    const bytes = createHash("sha256").update(naturalKey).digest().subarray(0, 16)
+    return crockfordBase32(bytes)
+}
+
 // Natural keys use the provider timestamp VERBATIM as returned by the API,
 // never a normalized or derived value - see architecture/core/longevity.md.
 export const savedKey = (addedAt, uri) => `spotify|saved|${addedAt}|${uri}`

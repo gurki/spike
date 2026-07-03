@@ -8,7 +8,7 @@ import Auth from "./src/auth.js"
 import "./src/provider/spotify.js"
 import { LikesWatcher, HistoryWatcher } from "./src/provider/watcher.js"
 import { recordSaved, recordHeard, getSyncState, setSyncState } from "./src/eventstore.js"
-import { withLock, getJob, syncLikes, reconcile, verify, importHistory, startHydrate } from "./src/ops.js"
+import { withLock, getJob, syncLikes, reconcile, verify, importHistory, journeySync, startHydrate } from "./src/ops.js"
 import { getStats, getEvents, getTracks, getPlaylists, getArtwork } from "./src/queries.js"
 import { BROWSE_HTML } from "./src/browse.js"
 import { localMonth } from "./src/time.js"
@@ -87,6 +87,10 @@ app.post("/ops/verify", opHandler((req) => () => verify({
 app.post("/ops/import-history", opHandler((req) => () => importHistory({
     path: req.query.path,
     minMs: req.query["min-ms"] ? Number(req.query["min-ms"]) : undefined,
+})))
+
+app.post("/ops/journey-sync", opHandler((req) => () => journeySync({
+    full: flag(req.query.full),
 })))
 
 app.post("/ops/hydrate", (req, res) => {

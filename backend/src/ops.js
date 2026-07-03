@@ -68,6 +68,12 @@ export async function verify(flags = {}) {
     return verifyImpl(flags) // does its own full likes sync internally
 }
 
+// Push canonical data to the journey server (idempotent, cursor-based).
+export async function journeySync(flags = {}) {
+    const { journeySync: impl } = await import("./journey.js")
+    return impl(flags)
+}
+
 // Rebuild play history from a Spotify GDPR extended-streaming-history export.
 export async function importHistory(flags = {}) {
     const { importHistory: impl } = await import("./import_history.js")

@@ -114,6 +114,15 @@ const commands = {
         return 0
     },
 
+    "journey-sync": async (flags) => {
+        const { body } = await call("POST", "/ops/journey-sync", flags)
+        console.log(`✅ pushed ${body.tracks} tracks + ${body.events} events ` +
+            `(${body.accepted} accepted, ${body.superseded} superseded, ${body.rejected.length} rejected) · ` +
+            `blobs: ${body.blobsUploaded} uploaded, ${body.blobsSkipped} already present · ` +
+            `${body.skippedIncomplete} incomplete skipped`)
+        return body.rejected.length ? 2 : 0
+    },
+
     "hydrate": async (flags) => {
         const { body } = await call("POST", "/ops/hydrate", flags)
         console.log(`⏳ hydrate started (job ${body.id})`)
@@ -166,6 +175,7 @@ commands:
                                    sync monthly playlists to liked songs
   verify [--strict] [--deep]       consistency + integrity checks (exit 2 on drift)
   import-history --path <dir>      import a spotify gdpr extended streaming history
+  journey-sync [--full]            push tracks, events and artwork to the journey server
   hydrate                          backfill track metadata + album artwork
   stats                            totals, likes per month, top artists
   events [--month] [--kind] [--limit]
