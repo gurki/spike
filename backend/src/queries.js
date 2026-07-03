@@ -35,8 +35,28 @@ export function getStats() {
     }
 }
 
-export function getTracks({ q = null, limit = 100, offset = 0 } = {}) {
+export function getTracks({ q = null, month = null, playlist = null, limit = 100, offset = 0 } = {}) {
     const like = q ? `%${q}%` : null
+
+    // playlist=YYYY-MM: the actual cached contents of that monthly playlist
+    if (playlist) {
+        const tracks = getDb().prepare(`
+            SELECT t.uri, t.title, t.artists, t.album_name, t.album_release_date,
+                   t.duration_ms, t.explicit, t.is_local, t.artwork_sha256,
+                   pi.added_at AS saved_at,
+                   (SELECT COUNT(*) FROM events e WHERE e.track_uri = t.uri AND e.kind = 'heard') AS heard_count
+            FROM playlist_items pi
+            JOIN playlists p ON p.uri = pi.playlist_uri
+            JOIN tracks t ON t.uri = pi.track_uri
+            WHERE p.name = @playlist
+              AND (@like IS NULL OR t.title LIKE @like OR t.artists LIKE @like OR t.album_name LIKE @like)
+            ORDER BY pi.added_at
+            LIMIT @limit OFFSET @offset
+        `).all({ playlist, like, limit: Number(limit) || 100, offset: Number(offset) || 0 })
+        return { tracks, total: tracks.length }
+    }
+
+    // month=YYYY-MM: tracks liked that month (desired state)
     const tracks = getDb().prepare(`
         SELECT t.uri, t.title, t.artists, t.album_name, t.album_release_date,
                t.duration_ms, t.explicit, t.is_local, t.artwork_sha256,
@@ -46,12 +66,24 @@ export function getTracks({ q = null, limit = 100, offset = 0 } = {}) {
         LEFT JOIN events e ON e.track_uri = t.uri
         WHERE (@like IS NULL OR t.title LIKE @like OR t.artists LIKE @like OR t.album_name LIKE @like)
         GROUP BY t.uri
+        HAVING (@month IS NULL OR MAX(CASE WHEN e.kind = 'saved' AND e.month = @month THEN 1 END) = 1)
         ORDER BY saved_at DESC NULLS LAST
         LIMIT @limit OFFSET @offset
-    `).all({ like, limit: Number(limit) || 100, offset: Number(offset) || 0 })
+    `).all({ like, month, limit: Number(limit) || 100, offset: Number(offset) || 0 })
 
     const total = getDb().prepare("SELECT COUNT(*) n FROM tracks").get().n
     return { tracks, total }
+}
+
+export function getPlaylists() {
+    return getDb().prepare(`
+        SELECT p.name AS month, p.provider_playlist_id AS id, p.last_synced,
+               (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_uri = p.uri) AS present,
+               (SELECT COUNT(DISTINCT e.track_uri) FROM events e WHERE e.kind = 'saved' AND e.month = p.name) AS liked
+        FROM playlists p
+        WHERE p.name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'
+        ORDER BY p.name DESC
+    `).all()
 }
 
 export function getArtwork(sha256) {

@@ -9,7 +9,7 @@ import "./src/provider/spotify.js"
 import { LikesWatcher, HistoryWatcher } from "./src/provider/watcher.js"
 import { recordSaved, recordHeard, getSyncState, setSyncState } from "./src/eventstore.js"
 import { withLock, getJob, syncLikes, reconcile, verify, startHydrate } from "./src/ops.js"
-import { getStats, getEvents, getTracks, getArtwork } from "./src/queries.js"
+import { getStats, getEvents, getTracks, getPlaylists, getArtwork } from "./src/queries.js"
 import { BROWSE_HTML } from "./src/browse.js"
 import { localMonth } from "./src/time.js"
 import { closeDb } from "./src/db/init.js"
@@ -35,6 +35,10 @@ app.get("/events", (req, res) => {
 
 app.get("/tracks", (req, res) => {
     res.json(getTracks(req.query))
+})
+
+app.get("/playlists", (req, res) => {
+    res.json({ playlists: getPlaylists() })
 })
 
 app.get("/artwork/:sha256", (req, res) => {
