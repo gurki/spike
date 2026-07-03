@@ -152,6 +152,30 @@ test("importHistory: filters, fuzzy dedupe, idempotence", async () => {
 
 // --- desired state ----------------------------------------------------------------
 
+test("desiredByMonth excludes same-second bulk saves (album saves/imports)", () => {
+    const bulkTs = "2025-01-10T08:00:00Z"
+    for (let i = 0; i < 6; i++) {
+        recordSaved(bulkTs, { uri: `spotify:track:bulkalbum${i}`, name: "B" + i, artists: [{ name: "X" }] })
+    }
+    recordSaved("2025-01-11T09:00:00Z", { uri: "spotify:track:realjan1", name: "R1", artists: [{ name: "Y" }] })
+    recordSaved("2025-01-12T09:00:00Z", { uri: "spotify:track:realjan2", name: "R2", artists: [{ name: "Y" }] })
+
+    const bucket = desiredByMonth("2025-01").get("2025-01")
+    assert.equal(bucket.desired.size, 2)
+    assert.equal(bucket.bulkSkipped.length, 6)
+
+    const withBulk = desiredByMonth("2025-01", { includeBulk: true }).get("2025-01")
+    assert.equal(withBulk.desired.size, 8)
+    assert.equal(withBulk.bulkSkipped.length, 0)
+
+    // below threshold: 4 same-second saves stay desired
+    const smallTs = "2025-02-10T08:00:00Z"
+    for (let i = 0; i < 4; i++) {
+        recordSaved(smallTs, { uri: `spotify:track:smallbatch${i}`, name: "S" + i, artists: [{ name: "Z" }] })
+    }
+    assert.equal(desiredByMonth("2025-02").get("2025-02").desired.size, 4)
+})
+
 test("desiredByMonth groups by berlin month and sets aside local files", () => {
     recordSaved("2024-08-31T23:30:00Z", { uri: "spotify:track:sept", name: "S", artists: [{ name: "A" }] }) // 01:30 CEST sept 1
     recordSaved("2024-09-02T10:00:00Z", { uri: "spotify:local:a:b:c:1", is_local: true, name: "L", artists: [{ name: "A" }] })

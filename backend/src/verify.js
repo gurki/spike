@@ -66,6 +66,10 @@ export async function verify({ strict = false, deep = false } = {}) {
         check("artwork integrity (deep)", corrupt.length === 0, `${corrupt.length} files fail re-hash`)
     }
 
+    // bulk saves (informational - excluded from monthly playlists by design)
+    const bulk = result.months.reduce((n, m) => n + (m.bulkSkipped?.length ?? 0), 0)
+    check("bulk saves", true, `${bulk} same-second bulk saves (album saves/imports) excluded from playlists`)
+
     // 6. local tracks (informational - never representable in playlists via API)
     const locals = db.prepare("SELECT COUNT(*) n FROM tracks WHERE is_local = 1").get().n
     check("local tracks", true, `${locals} local-file tracks (excluded from playlists by the api)`)

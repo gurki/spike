@@ -6,22 +6,32 @@ const MONTHLY_NAME = /^\d{4}-\d{2}$/
 
 // --- desired state: liked tracks grouped by Berlin month -----------------
 
-export function desiredByMonth(month = null) {
+// A human cannot individually like BULK_THRESHOLD songs within one second;
+// identical added_at timestamps mean an album save (pre-2019 spotify saved
+// all album tracks to liked songs) or a bulk library import. Those stay in
+// the event log but are excluded from monthly playlists by default.
+const BULK_THRESHOLD = Number(process.env.BULK_THRESHOLD) || 5
+
+export function desiredByMonth(month = null, { includeBulk = false } = {}) {
     const rows = getDb().prepare(`
-        SELECT e.month, e.track_uri, MIN(e.triggered_at) AS added_at, t.is_local
+        SELECT e.month, e.track_uri, e.triggered_at AS added_at, t.is_local,
+               COUNT(*) OVER (PARTITION BY e.triggered_at) AS cluster
         FROM events e
         JOIN tracks t ON t.uri = e.track_uri
         WHERE e.kind = 'saved' AND (@month IS NULL OR e.month = @month)
-        GROUP BY e.month, e.track_uri
         ORDER BY e.month, added_at
     `).all({ month })
 
     const months = new Map()
     for (const row of rows) {
-        if (!months.has(row.month)) months.set(row.month, { desired: new Map(), localSkipped: [] })
+        if (!months.has(row.month)) months.set(row.month, { desired: new Map(), localSkipped: [], bulkSkipped: [] })
         const bucket = months.get(row.month)
+        if (bucket.desired.has(row.track_uri) || bucket.localSkipped.includes(row.track_uri)
+            || bucket.bulkSkipped.includes(row.track_uri)) continue // earliest event per month wins
         if (row.is_local) {
             bucket.localSkipped.push(row.track_uri) // Web API cannot add local files
+        } else if (!includeBulk && row.cluster >= BULK_THRESHOLD) {
+            bucket.bulkSkipped.push(row.track_uri)
         } else {
             bucket.desired.set(row.track_uri, row.added_at)
         }
@@ -91,12 +101,12 @@ export function diffMonth(desired, actualUris) {
 
 // --- reconcile ------------------------------------------------------------
 
-export async function reconcile({ month = null, since = null, dryRun = false, prune = false, refresh = false } = {}) {
+export async function reconcile({ month = null, since = null, dryRun = false, prune = false, refresh = false, includeBulk = false } = {}) {
     const adapter = getAdapter(process.env.PROVIDER || "spotify")
     const db = getDb()
     const store = playlistStore(db)
 
-    const desired = desiredByMonth(month)
+    const desired = desiredByMonth(month, { includeBulk })
     const playlists = await adapter.fetchPlaylists()
     const monthlies = new Map(playlists.filter((p) => MONTHLY_NAME.test(p.name)).map((p) => [p.name, p]))
 
@@ -111,7 +121,7 @@ export async function reconcile({ month = null, since = null, dryRun = false, pr
     let removed = 0
 
     for (const m of months) {
-        const bucket = desired.get(m) ?? { desired: new Map(), localSkipped: [] }
+        const bucket = desired.get(m) ?? { desired: new Map(), localSkipped: [], bulkSkipped: [] }
         let playlist = monthlies.get(m) ?? null
 
         const actualItems = playlist ? await loadPlaylistItems(adapter, store, playlist, { refresh }) : []
@@ -146,6 +156,7 @@ export async function reconcile({ month = null, since = null, dryRun = false, pr
             missing,
             extra,
             localSkipped: bucket.localSkipped,
+            bulkSkipped: bucket.bulkSkipped,
         })
     }
 

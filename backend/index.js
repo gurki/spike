@@ -76,6 +76,7 @@ app.post("/ops/reconcile", opHandler((req) => () => reconcile({
     dryRun: flag(req.query["dry-run"]),
     prune: flag(req.query.prune),
     refresh: flag(req.query.refresh),
+    includeBulk: flag(req.query["include-bulk"]),
 })))
 
 app.post("/ops/verify", opHandler((req) => () => verify({

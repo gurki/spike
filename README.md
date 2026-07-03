@@ -98,6 +98,13 @@ all the same code path. reconcile is **additive-only**: tracks you removed
 from a playlist by hand, or unliked later, are reported but never touched
 (`--prune` opts into exact matching per run).
 
+**bulk saves are excluded.** pre-2019, saving an album added every track to
+liked songs; bulk library imports do the same. those events share identical
+`added_at` timestamps - a human can't individually like 5 songs in one
+second - so same-second clusters of ≥ 5 (`BULK_THRESHOLD`) are kept in the
+event log but skipped by reconcile, reported in the `bulk` column.
+`--include-bulk` opts them back in.
+
 ### Events
 
 every observation is an event row with a **deterministic id** derived from

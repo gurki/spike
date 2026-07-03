@@ -62,15 +62,18 @@ function printReconcile(result) {
         present: m.present,
         missing: m.missing.length,
         extra: m.extra.length,
+        bulk: m.bulkSkipped?.length ?? 0,
         local: m.localSkipped.length,
     }))
-    printTable(rows, ["month", "playlist", "liked", "present", "missing", "extra", "local"])
+    printTable(rows, ["month", "playlist", "liked", "present", "missing", "extra", "bulk", "local"])
 
     const drift = result.months.filter((m) => m.missing.length || m.extra.length)
     const missing = drift.reduce((n, m) => n + m.missing.length, 0)
     const extra = drift.reduce((n, m) => n + m.extra.length, 0)
+    const bulk = result.months.reduce((n, m) => n + (m.bulkSkipped?.length ?? 0), 0)
     console.log(`\n${drift.length} months with drift · ${missing} missing · ${extra} extra` +
-        (extra ? " (kept; use --prune to remove)" : ""))
+        (extra ? " (kept; use --prune to remove)" : "") +
+        (bulk ? ` · ${bulk} bulk saves excluded (album saves/imports; --include-bulk to add)` : ""))
     if (result.applied) console.log(`applied: ${result.applied.added} added, ${result.applied.removed} removed`)
 }
 
@@ -158,7 +161,8 @@ usage: spike <command> [flags]
 
 commands:
   sync-likes                       rebuild/refresh likes from the spotify api
-  reconcile [--dry-run] [--prune] [--month YYYY-MM] [--refresh]
+  reconcile [--dry-run] [--prune] [--month YYYY-MM] [--since YYYY-MM]
+            [--include-bulk] [--refresh]
                                    sync monthly playlists to liked songs
   verify [--strict] [--deep]       consistency + integrity checks (exit 2 on drift)
   import-history --path <dir>      import a spotify gdpr extended streaming history
