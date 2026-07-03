@@ -4,7 +4,6 @@
   "main": "index.js",
   "license": "MIT",
   "type": "module",
-  "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js --ignore ./db/",
     "start": "node index.js"
@@ -15,7 +14,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "querystring": "^0.2.1"
+    "querystring": "^0.2.1",
+    "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
