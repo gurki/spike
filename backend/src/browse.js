@@ -24,6 +24,8 @@ export const BROWSE_HTML = `<!doctype html>
     #count { color: #888; font-size: 12px; }
     main { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
            gap: 16px; padding: 8px 20px 40px; }
+    .card { display: block; color: inherit; text-decoration: none; }
+    .card[href]:hover img, .card[href]:hover .noart { outline: 2px solid #2e5c3f; }
     .card img, .card .noart { width: 100%; aspect-ratio: 1; border-radius: 6px;
            background: #1e1e1e; object-fit: cover; display: block; }
     .noart { display: grid; place-items: center; color: #444; font-size: 32px; }
@@ -92,11 +94,13 @@ export const BROWSE_HTML = `<!doctype html>
                 : '<div class="noart">♪</div>'
             const saved = t.saved_at ? t.saved_at.slice(0, 10) : "–"
             const heard = t.heard_count ? " · ♫ " + t.heard_count : ""
-            return '<div class="card">' + art +
+            const id = t.uri.startsWith("spotify:track:") ? t.uri.split(":")[2] : null
+            const open = id ? ' href="https://open.spotify.com/track/' + id + '" target="_blank" rel="noopener"' : ""
+            return '<a class="card"' + open + '>' + art +
                 '<div class="t">' + esc(t.title ?? t.uri) + '</div>' +
                 '<div class="a">' + esc(artists) + '</div>' +
                 '<div class="m">' + esc(t.album_name ?? "") + '</div>' +
-                '<div class="m">' + (mode === "playlist" && monthSel.value ? "▶ " : "❤ ") + saved + heard + '</div></div>'
+                '<div class="m">' + (mode === "playlist" && monthSel.value ? "▶ " : "❤ ") + saved + heard + '</div></a>'
         }).join("")
     }
 
