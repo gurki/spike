@@ -1,0 +1,19 @@
+# Alternative to Docker Compose: run spike directly under systemd with bun
+# installed on the host. Install:
+#   sudo cp deploy/spike.service /etc/systemd/system/
+#   sudo systemctl enable --now spike
+[Unit]
+Description=spike - spotify watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/spike/backend
+ExecStart=/usr/local/bin/bun index.js
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/srv/spike/backend/.env
+
+[Install]
+WantedBy=multi-user.target

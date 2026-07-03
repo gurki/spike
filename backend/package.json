@@ -1,23 +1,22 @@
 {
   "name": "spike",
-  "version": "23w14-dev",
+  "version": "26w27-dev",
   "main": "index.js",
   "license": "MIT",
   "type": "module",
-  "main": "index.js",
+  "bin": {
+    "spike": "./cli.js"
+  },
   "scripts": {
-    "dev": "nodemon index.js --ignore ./db/",
-    "start": "node index.js"
+    "dev": "bun --watch index.js",
+    "start": "bun index.js",
+    "test": "node --test test/"
   },
   "dependencies": {
+    "better-sqlite3": "^12.0.0",
     "chalk": "^5.2.0",
-    "cookie-parser": "^1.4.6",
-    "cors": "^2.8.5",
     "dotenv": "^16.0.3",
-    "express": "^4.18.2",
-    "querystring": "^0.2.1"
+    "express": "^4.18.2"
   },
-  "devDependencies": {
-    "nodemon": "^2.0.22"
-  }
+  "trustedDependencies": []
 }
