@@ -134,9 +134,12 @@ journey server.
 
 ## Endpoints
 
+- `GET /browse` - searchable cover grid of all tracks (open in a browser)
 - `GET /healthz` - liveness
 - `GET /stats` - totals, likes per month, top artists, last sync times
 - `GET /events?month=&kind=&limit=` - event log
+- `GET /tracks?q=&limit=&offset=` - track details incl. saved date + play count
+- `GET /artwork/<sha256>` - album cover from the content-addressed store
 - `POST /ops/sync-likes | /ops/reconcile | /ops/verify` - operations (query
   params: `dry-run`, `prune`, `month`, `since`, `strict`, `deep`)
 - `POST /ops/hydrate` + `GET /ops/jobs/:id` - long-running hydration

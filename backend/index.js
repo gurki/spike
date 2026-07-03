@@ -9,7 +9,8 @@ import "./src/provider/spotify.js"
 import { LikesWatcher, HistoryWatcher } from "./src/provider/watcher.js"
 import { recordSaved, recordHeard, getSyncState, setSyncState } from "./src/eventstore.js"
 import { withLock, getJob, syncLikes, reconcile, verify, startHydrate } from "./src/ops.js"
-import { getStats, getEvents } from "./src/queries.js"
+import { getStats, getEvents, getTracks, getArtwork } from "./src/queries.js"
+import { BROWSE_HTML } from "./src/browse.js"
 import { localMonth } from "./src/time.js"
 import { closeDb } from "./src/db/init.js"
 
@@ -30,6 +31,22 @@ app.get("/stats", (req, res) => {
 
 app.get("/events", (req, res) => {
     res.json(getEvents(req.query))
+})
+
+app.get("/tracks", (req, res) => {
+    res.json(getTracks(req.query))
+})
+
+app.get("/artwork/:sha256", (req, res) => {
+    const artwork = getArtwork(req.params.sha256)
+    if (!artwork) return res.sendStatus(404)
+    res.set("Cache-Control", "public, max-age=31536000, immutable")
+    if (artwork.content_type) res.type(artwork.content_type)
+    res.sendFile(artwork.path)
+})
+
+app.get("/browse", (req, res) => {
+    res.type("html").send(BROWSE_HTML)
 })
 
 // --- operations (the daemon is the single executor) -----------------------

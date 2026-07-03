@@ -35,6 +35,29 @@ export function getStats() {
     }
 }
 
+export function getTracks({ q = null, limit = 100, offset = 0 } = {}) {
+    const like = q ? `%${q}%` : null
+    const tracks = getDb().prepare(`
+        SELECT t.uri, t.title, t.artists, t.album_name, t.album_release_date,
+               t.duration_ms, t.explicit, t.is_local, t.artwork_sha256,
+               MIN(CASE WHEN e.kind = 'saved' THEN e.triggered_at END) AS saved_at,
+               COUNT(CASE WHEN e.kind = 'heard' THEN 1 END) AS heard_count
+        FROM tracks t
+        LEFT JOIN events e ON e.track_uri = t.uri
+        WHERE (@like IS NULL OR t.title LIKE @like OR t.artists LIKE @like OR t.album_name LIKE @like)
+        GROUP BY t.uri
+        ORDER BY saved_at DESC NULLS LAST
+        LIMIT @limit OFFSET @offset
+    `).all({ like, limit: Number(limit) || 100, offset: Number(offset) || 0 })
+
+    const total = getDb().prepare("SELECT COUNT(*) n FROM tracks").get().n
+    return { tracks, total }
+}
+
+export function getArtwork(sha256) {
+    return getDb().prepare("SELECT path, content_type FROM artwork WHERE sha256 = ?").get(sha256) ?? null
+}
+
 export function getEvents({ month = null, kind = null, limit = 50 } = {}) {
     const events = getDb().prepare(`
         SELECT e.id, e.kind, e.triggered_at, e.month, e.context_type, e.context_uri,
