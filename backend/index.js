@@ -9,6 +9,7 @@ import "./src/provider/spotify.js"
 import { LikesWatcher, HistoryWatcher } from "./src/provider/watcher.js"
 import { recordSaved, recordListen, getSyncState, setSyncState } from "./src/eventstore.js"
 import { withLock, getJob, syncLikes, reconcile, verify, importHistory, journeySync, startHydrate } from "./src/ops.js"
+import { hydrate } from "./src/hydrate.js"
 import { getStats, getEvents, getTracks, getPlaylists, getArtwork } from "./src/queries.js"
 import { BROWSE_HTML } from "./src/browse.js"
 import { localMonth } from "./src/time.js"
@@ -61,7 +62,7 @@ function opHandler(fn, { autoSync = false } = {}) {
     return async (req, res) => {
         try {
             res.json(await withLock(fn(req)))
-            if (autoSync) scheduleJourneySync()
+            if (autoSync) scheduleSync()
         } catch (error) {
             console.error("❌ op failed:", error)
             res.status(500).json({ error: error.message })
@@ -111,22 +112,25 @@ const historyWatcher = new HistoryWatcher()
 let reconcileTimer = null
 const pendingMonths = new Set()
 
-// auto-push to the journey server after any change (new listen, like,
-// playlist add). debounced; failures are retried on the next trigger since
-// the cursor only advances after a clean push.
-let journeyTimer = null
+// after any change (new listen, like, playlist add) hydrate freshly-discovered
+// tracks (full metadata + album artwork) and then push to the journey server.
+// debounced; hydrate always runs (artwork also feeds local /browse), journey
+// push only if configured. failures retry on the next trigger since neither
+// hydrate nor the journey cursor/dirty-marks advance on error.
+let syncTimer = null
+const journeyConfigured = () => Boolean(process.env.JOURNEY_TOKEN && process.env.JOURNEY_CLIENT_ID)
 
-function scheduleJourneySync() {
-    if (!process.env.JOURNEY_TOKEN || !process.env.JOURNEY_CLIENT_ID) return
-    clearTimeout(journeyTimer)
-    journeyTimer = setTimeout(() => {
-        withLock(() => journeySync())
-            .then((result) => {
-                if (result.tracks || result.events) {
-                    console.log(`🛰️ journey: pushed ${result.tracks} tracks, ${result.events} events`)
-                }
-            })
-            .catch((error) => console.error("❌ journey sync failed:", error.message))
+function scheduleSync() {
+    clearTimeout(syncTimer)
+    syncTimer = setTimeout(() => {
+        withLock(async () => {
+            const h = await hydrate()
+            if (h.hydrated) console.log(`🎨 hydrated ${h.hydrated} tracks, ${h.artworkDownloaded} covers`)
+            if (journeyConfigured()) {
+                const j = await journeySync()
+                if (j.tracks || j.events) console.log(`🛰️ journey: pushed ${j.tracks} tracks, ${j.events} events`)
+            }
+        }).catch((error) => console.error("❌ auto-sync failed:", error.message))
     }, 10_000)
 }
 
@@ -134,7 +138,7 @@ likesWatcher.on("saved", ({ addedAt, track }) => {
     const { inserted } = recordSaved(addedAt, track)
     if (!inserted) return
     setSyncState("likes_cursor", Date.parse(addedAt))
-    scheduleJourneySync()
+    scheduleSync()
 
     // debounce: batch likes arriving together into one reconcile per month
     pendingMonths.add(localMonth(addedAt))
@@ -145,7 +149,7 @@ likesWatcher.on("saved", ({ addedAt, track }) => {
                 .then((result) => {
                     const applied = result.applied?.added ?? 0
                     if (applied) console.log(`✅ reconciled ${month}: ${applied} added`)
-                    scheduleJourneySync() // reconcile records playlist-added events
+                    scheduleSync() // reconcile records playlist-added events
                 })
                 .catch((error) => console.error("❌ watcher reconcile failed:", error.message))
         }
@@ -157,7 +161,7 @@ historyWatcher.on("listen", ({ playedAt, track, context }) => {
     const { inserted } = recordListen(playedAt, track, context)
     if (!inserted) return
     setSyncState("history_cursor", Date.parse(playedAt))
-    scheduleJourneySync()
+    scheduleSync()
 })
 
 // --- lifecycle --------------------------------------------------------------
@@ -185,7 +189,7 @@ const server = app.listen(PORT, async () => {
 function shutdown() {
     console.log("👋 shutting down ...")
     clearTimeout(reconcileTimer)
-    clearTimeout(journeyTimer)
+    clearTimeout(syncTimer)
     server.close(() => {
         closeDb()
         process.exit(0)

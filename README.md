@@ -146,6 +146,12 @@ records events, and triggers a debounced reconcile of the affected month.
 watcher cursors persist in the database, so likes during downtime are picked
 up on the next poll or `sync-likes`.
 
+any newly discovered song - via a like, a listen, or a playlist add - is
+**hydrated automatically**: the same debounced action fetches full track
+metadata and downloads the album cover, so `/browse` shows the art and the
+journey push carries it without a manual `hydrate`. the `hydrate` command
+remains for backfilling an existing database.
+
 ### Journey sync
 
 with `JOURNEY_URL`, `JOURNEY_TOKEN`, and `JOURNEY_CLIENT_ID` configured (a
@@ -160,12 +166,15 @@ its normal sync api:
   events become `music.library_event` items - reusing the event ids, which
   are already journey-style deterministic ulids
 
-pushes are cursor-based (only new rows) and idempotent (`--full` re-pushes
-everything; the server absorbs duplicates). the daemon also pushes
-automatically: any new listen, like, or playlist add triggers a debounced
-journey sync ~10s later, and failures retry on the next change since the
-cursor only advances after a clean push. spike stays the source of its own
-working state; journey is the archive.
+immutable events push once (rowid cursor); mutable tracks are dirty-tracked
+and **re-push when their metadata or artwork is filled in later**, so a track
+never lands on the archive permanently art-less. the daemon hydrates before
+pushing, so tracks normally arrive with artwork on the first push. the whole
+thing is idempotent (`--full` re-pushes everything; the server absorbs
+duplicates) and automatic: any new listen, like, or playlist add triggers a
+debounced hydrate-then-push ~10s later, and failures retry on the next change
+since neither the cursor nor the dirty marks advance on error. spike stays
+the source of its own working state; journey is the archive.
 
 ### Artwork
 

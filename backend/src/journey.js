@@ -174,22 +174,26 @@ export async function journeySync({ full = false } = {}) {
     const db = getDb()
     const result = { tracks: 0, events: 0, skippedIncomplete: 0, blobsUploaded: 0, blobsSkipped: 0, accepted: 0, superseded: 0, rejected: [] }
 
-    const trackCursor = full ? 0 : Number(getSyncState("journey_cursor_tracks")) || 0
     const eventCursor = full ? 0 : Number(getSyncState("journey_cursor_events")) || 0
 
     // 1. tracks (with artwork blobs first - the server requires attachment
-    //    blobs to exist before the referencing item)
+    //    blobs to exist before the referencing item). Tracks are mutable, so
+    //    push is dirty-driven: complete tracks that were never synced or were
+    //    hydrated since their last sync. --full re-pushes every complete track.
+    const dirty = full ? "" : "AND (t.journey_synced_at IS NULL OR t.journey_synced_at < COALESCE(t.hydrated_at, t.created_at))"
     const trackRows = db.prepare(`
         SELECT t.rowid AS rid, t.*, a.sha256, a.path, a.content_type, a.bytes
         FROM tracks t LEFT JOIN artwork a ON a.sha256 = t.artwork_sha256
-        WHERE t.rowid > ? ORDER BY t.rowid
-    `).all(trackCursor)
+        WHERE t.title IS NOT NULL AND t.artists IS NOT NULL ${dirty}
+        ORDER BY t.rowid
+    `).all()
 
     const trackItems = []
+    const pushedTrackUris = []
     for (const row of trackRows) {
-        if (!row.title || !row.artists) { result.skippedIncomplete++; continue }
         if (row.sha256) await uploadBlob(cfg, row, result)
         trackItems.push(trackItem(row, row.sha256 ? row : null, cfg.clientId))
+        pushedTrackUris.push(row.uri)
     }
     await pushItems(cfg, trackItems, result)
     result.tracks = trackItems.length
@@ -217,7 +221,11 @@ export async function journeySync({ full = false } = {}) {
     result.events = eventItems.length
 
     if (result.rejected.length === 0) {
-        if (trackRows.length) setSyncState("journey_cursor_tracks", trackRows[trackRows.length - 1].rid)
+        // mark pushed tracks synced (chunked to stay within sqlite's variable limit)
+        const markSynced = db.prepare("UPDATE tracks SET journey_synced_at = datetime('now') WHERE uri = ?")
+        db.transaction(() => {
+            for (const uri of pushedTrackUris) markSynced.run(uri)
+        })()
         if (eventRows.length) setSyncState("journey_cursor_events", eventRows[eventRows.length - 1].rid)
         setSyncState("last_journey_sync", new Date().toISOString())
     }
