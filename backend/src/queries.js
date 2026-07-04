@@ -116,19 +116,22 @@ export function getArtwork(sha256) {
     return getDb().prepare("SELECT path, content_type FROM artwork WHERE sha256 = ?").get(sha256) ?? null
 }
 
-export function getEvents({ month = null, kind = null, part = null, limit = 50 } = {}) {
+export function getEvents({ month = null, kind = null, part = null, q = null, limit = 50, offset = 0 } = {}) {
     const part_sql = part ? partClause(part) : null
+    const like = q ? `%${q}%` : null
     const events = getDb().prepare(`
         SELECT e.id, e.kind, e.triggered_at, e.local_time, e.tz, e.month,
-               e.context_type, e.context_uri, e.track_uri, t.title, t.artists
+               e.context_type, e.context_uri, e.track_uri,
+               t.title, t.artists, t.album_name, t.artwork_sha256
         FROM events e
         JOIN tracks t ON t.uri = e.track_uri
         WHERE (@kind IS NULL OR e.kind = @kind)
           AND (@month IS NULL OR e.month = @month)
+          AND (@like IS NULL OR t.title LIKE @like OR t.artists LIKE @like)
           ${part_sql ? `AND ${part_sql}` : ""}
         ORDER BY e.triggered_at DESC
-        LIMIT @limit
-    `).all({ month, kind, limit: Number(limit) || 50 })
+        LIMIT @limit OFFSET @offset
+    `).all({ month, kind, like, limit: Number(limit) || 50, offset: Number(offset) || 0 })
 
     return { events }
 }

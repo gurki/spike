@@ -202,7 +202,7 @@ journey server.
 
 ## Endpoints
 
-- `GET /browse` - searchable cover grid of all tracks (open in a browser)
+- `GET /browse` - open in a browser: a **Library** cover grid of all tracks, and a **History** view — a day-grouped listen timeline (search + part-of-day filter, newest first)
 - `GET /healthz` - liveness
 - `GET /stats` - totals, likes per month, top artists, last sync times
 - `GET /events?month=&kind=&limit=` - event log
