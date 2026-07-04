@@ -116,6 +116,20 @@ rebuilding the database from scratch never creates duplicates:
 - `playlist-added` - a track landing in a monthly playlist (also backfilled
   from spotify's own `added_at` when playlists are scanned)
 
+every event also stores a **local timestamp + timezone** alongside the
+verbatim utc `triggered_at`. spotify reports only utc, so local time is
+derived from the home zone (`SPIKE_TZ`, default `Europe/Berlin`) at record
+time - sqlite can't do IANA/DST math, so it's precomputed like `month`. this
+makes time-of-day queries possible:
+
+```sh
+bun cli.js events --kind listen --part morning   # morning|afternoon|evening|night
+bun cli.js stats                                  # includes a listens-by-hour histogram
+```
+
+part-of-day bands: morning 05-11, afternoon 12-16, evening 17-21, night
+22-04 (local).
+
 ### Rebuild from the source of truth
 
 `sync-likes` refetches the entire library; deterministic ids make it
@@ -164,7 +178,9 @@ its normal sync api:
   with role `artwork`
 - `listen` events become `music.listen` items, `saved` and `playlist-added`
   events become `music.library_event` items - reusing the event ids, which
-  are already journey-style deterministic ulids
+  are already journey-style deterministic ulids, and carrying the event's
+  timezone in the envelope `tz` field (canonical utc `ts` for ordering,
+  explicit `tz` for meaning) so the archive can answer time-of-day queries
 
 immutable events push once (rowid cursor); mutable tracks are dirty-tracked
 and **re-push when their metadata or artwork is filled in later**, so a track

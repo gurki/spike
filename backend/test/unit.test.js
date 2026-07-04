@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 
 process.env.SPIKE_DB_PATH = ":memory:"
 
-const { localMonth } = await import("../src/time.js")
+const { localMonth, localTime, TIME_ZONE } = await import("../src/time.js")
 const { deterministicUlid, savedKey, listenKey } = await import("../src/ids.js")
 const { canonicalUri } = await import("../src/canonical.js")
 const { diffMonth, desiredByMonth } = await import("../src/reconcile.js")
@@ -19,6 +19,16 @@ test("month bucketing across DST and midnight", () => {
     assert.equal(localMonth("2024-10-26T23:30:00Z"), "2024-10")   // CEST->CET fall-back weekend
     assert.equal(localMonth("2024-01-31T22:59:59Z"), "2024-01")   // 23:59 CET, still january
     assert.equal(localMonth("2024-01-31T23:00:00Z"), "2024-02")   // 00:00 CET, february
+})
+
+// --- local time (Europe/Berlin) ---------------------------------------------
+
+test("localTime applies home tz with correct DST offset", () => {
+    assert.equal(TIME_ZONE, "Europe/Berlin")
+    assert.equal(localTime("2026-07-04T06:15:00Z"), "2026-07-04T08:15:00+02:00") // CEST
+    assert.equal(localTime("2026-01-04T06:15:00Z"), "2026-01-04T07:15:00+01:00") // CET
+    assert.equal(localTime("2026-07-03T22:30:00Z"), "2026-07-04T00:30:00+02:00") // midnight wrap
+    assert.match(localTime("2026-07-04T06:15:00Z"), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
 })
 
 // --- deterministic ULIDs ----------------------------------------------------

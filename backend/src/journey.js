@@ -87,6 +87,7 @@ function eventItem(event, track, playlistName, clientId) {
         createdAt: ts,
         updatedAt: ts,
         source: source(clientId),
+        ...(event.tz && { tz: event.tz }),
     }
 
     if (event.kind === "listen") {

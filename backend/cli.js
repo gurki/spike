@@ -147,6 +147,14 @@ const commands = {
         printTable(body.likesPerMonth, ["month", "likes"])
         console.log("")
         printTable(body.topArtists, ["artist", "likes"])
+        if (body.listensByHour) {
+            const max = Math.max(1, ...body.listensByHour)
+            console.log("\nlistens by hour (local):")
+            body.listensByHour.forEach((n, h) => {
+                const bar = "█".repeat(Math.round((n / max) * 24))
+                console.log(`${String(h).padStart(2, "0")}  ${bar} ${n}`)
+            })
+        }
         return 0
     },
 
@@ -154,11 +162,11 @@ const commands = {
         const { body } = await call("GET", "/events", flags)
         if (flags.json) return console.log(JSON.stringify(body, null, 2)) ?? 0
         printTable(body.events.map((e) => ({
-            when: e.triggered_at,
+            local: e.local_time ?? e.triggered_at,
             kind: e.kind,
             title: e.title ?? e.track_uri,
             artists: e.artists ? JSON.parse(e.artists).join(", ") : "",
-        })), ["when", "kind", "title", "artists"])
+        })), ["local", "kind", "title", "artists"])
         return 0
     },
 }
@@ -177,8 +185,8 @@ commands:
   import-history --path <dir>      import a spotify gdpr extended streaming history
   journey-sync [--full]            push tracks, events and artwork to the journey server
   hydrate                          backfill track metadata + album artwork
-  stats                            totals, likes per month, top artists
-  events [--month] [--kind] [--limit]
+  stats                            totals, likes per month, top artists, listens by hour
+  events [--month] [--kind] [--part morning|afternoon|evening|night] [--limit]
                                    inspect the event log
 
 env: SPIKE_URL (default http://127.0.0.1:8888)`)

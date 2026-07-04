@@ -1,6 +1,23 @@
 import { getDb } from "./db/init.js"
 import { getSyncState } from "./eventstore.js"
 
+// Part-of-day bands over the local hour (night wraps midnight).
+const PART_HOURS = {
+    morning: [5, 11],
+    afternoon: [12, 16],
+    evening: [17, 21],
+    night: [22, 4],
+}
+
+// SQL predicate on the local hour for a part-of-day; null if part is unknown.
+function partClause(part) {
+    const band = PART_HOURS[part]
+    if (!band) return null
+    const [from, to] = band
+    const hour = "CAST(substr(e.local_time, 12, 2) AS INTEGER)"
+    return from <= to ? `${hour} BETWEEN ${from} AND ${to}` : `(${hour} >= ${from} OR ${hour} <= ${to})`
+}
+
 export function getStats() {
     const db = getDb()
 
@@ -26,10 +43,19 @@ export function getStats() {
         GROUP BY je.value ORDER BY likes DESC LIMIT 20
     `).all()
 
+    // 24-bucket histogram of listens by local hour (for "morning listening")
+    const rows = db.prepare(`
+        SELECT CAST(substr(local_time, 12, 2) AS INTEGER) AS hour, COUNT(*) AS n
+        FROM events WHERE kind = 'listen' AND local_time IS NOT NULL
+        GROUP BY hour
+    `).all()
+    const listensByHour = Array.from({ length: 24 }, (_, h) => rows.find((r) => r.hour === h)?.n ?? 0)
+
     return {
         totals,
         likesPerMonth,
         topArtists,
+        listensByHour,
         lastFullLikesSync: getSyncState("last_full_likes_sync"),
         lastReconcile: getSyncState("last_reconcile"),
     }
@@ -90,14 +116,16 @@ export function getArtwork(sha256) {
     return getDb().prepare("SELECT path, content_type FROM artwork WHERE sha256 = ?").get(sha256) ?? null
 }
 
-export function getEvents({ month = null, kind = null, limit = 50 } = {}) {
+export function getEvents({ month = null, kind = null, part = null, limit = 50 } = {}) {
+    const part_sql = part ? partClause(part) : null
     const events = getDb().prepare(`
-        SELECT e.id, e.kind, e.triggered_at, e.month, e.context_type, e.context_uri,
-               e.track_uri, t.title, t.artists
+        SELECT e.id, e.kind, e.triggered_at, e.local_time, e.tz, e.month,
+               e.context_type, e.context_uri, e.track_uri, t.title, t.artists
         FROM events e
         JOIN tracks t ON t.uri = e.track_uri
         WHERE (@kind IS NULL OR e.kind = @kind)
           AND (@month IS NULL OR e.month = @month)
+          ${part_sql ? `AND ${part_sql}` : ""}
         ORDER BY e.triggered_at DESC
         LIMIT @limit
     `).all({ month, kind, limit: Number(limit) || 50 })

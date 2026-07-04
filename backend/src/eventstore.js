@@ -1,6 +1,6 @@
 import { getDb } from "./db/init.js"
 import { canonicalUri } from "./canonical.js"
-import { localMonth } from "./time.js"
+import { localMonth, localTime, TIME_ZONE } from "./time.js"
 import { deterministicUlid, savedKey, listenKey, playlistAddedKey } from "./ids.js"
 
 let statements = null
@@ -38,10 +38,10 @@ function prepare() {
 
         insertEvent: db.prepare(`
             INSERT OR IGNORE INTO events (
-                id, natural_key, kind, track_uri, triggered_at, month,
+                id, natural_key, kind, track_uri, triggered_at, month, local_time, tz,
                 context_type, context_uri, provider, raw_snapshot
             ) VALUES (
-                @id, @natural_key, @kind, @track_uri, @triggered_at, @month,
+                @id, @natural_key, @kind, @track_uri, @triggered_at, @month, @local_time, @tz,
                 @context_type, @context_uri, @provider, @raw_snapshot
             )
         `),
@@ -89,6 +89,8 @@ function insertEvent(stmts, { kind, naturalKey, trackUri, triggeredAt, contextTy
         track_uri: trackUri,
         triggered_at: triggeredAt,
         month: localMonth(triggeredAt),
+        local_time: localTime(triggeredAt),
+        tz: TIME_ZONE,
         context_type: contextType ?? null,
         context_uri: contextUri ?? null,
         provider: "spotify",
