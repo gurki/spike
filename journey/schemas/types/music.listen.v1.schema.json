@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.journey.local/types/music.listen.v1.json",
+  "title": "music.listen v1",
+  "description": "One observed music play/listen event. Item IDs are deterministic and recomputable from the stored item: ULID time bits from the envelope ts (the provider's raw event timestamp, e.g. Spotify played_at), random bits from the first 80 bits of sha256('provider|ts|track.providerUri'). startedAt may be inferred from ts and durationMs (confidence: inferred).",
+  "type": "object",
+  "required": ["startedAt", "provider", "track"],
+  "properties": {
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Open-world provider slug, e.g. spotify, lastfm, apple-music, local."
+    },
+    "track": {
+      "type": "object",
+      "required": ["title", "artists"],
+      "description": "Snapshot of the track as observed. No item pointer is stored: the referenced music.track item's ID is derived from provider|providerUri.",
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "artists": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "providerUri": { "type": "string" },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "providerUri": { "type": "string" },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Open-world context kind, e.g. album, artist, playlist, show, collection."
+        },
+        "name": { "type": "string" }
+      }
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "How the observation was obtained, e.g. recently-played, import, manual, scrobble."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["exact", "inferred", "partial"],
+      "default": "exact"
+    }
+  }
+}

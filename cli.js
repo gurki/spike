@@ -2,7 +2,10 @@
 
 // Thin HTTP client for the running spike daemon. The daemon is the single
 // executor (db + spotify tokens); this just calls its endpoints and renders
-// the results.
+// the results. `journey-register` is the exception: an admin call straight to
+// the journey server, so the setup token never reaches the daemon.
+
+import { readFileSync } from "node:fs"
 
 const BASE_URL = process.env.SPIKE_URL || "http://127.0.0.1:8888"
 
@@ -123,6 +126,8 @@ const commands = {
         return body.rejected.length ? 2 : 0
     },
 
+    "journey-register": async (flags) => registerJourneyModule(flags),
+
     "hydrate": async (flags) => {
         const { body } = await call("POST", "/ops/hydrate", flags)
         console.log(`⏳ hydrate started (job ${body.id})`)
@@ -171,6 +176,51 @@ const commands = {
     },
 }
 
+// Register this repo's journey module (journey/journey.module.json) with a
+// journey server: inline the schema files the manifest references by path,
+// then POST the self-contained manifest to /api/modules/register. Re-running
+// upserts the manifest; the server refuses upgrades that would orphan a
+// schema version still used by stored items.
+async function registerJourneyModule(flags) {
+    const journeyUrl = flags.url || process.env.JOURNEY_URL || "http://127.0.0.1:8090"
+    const setupToken = process.env.JOURNEY_SETUP_TOKEN
+    if (!setupToken) {
+        console.error("❌ JOURNEY_SETUP_TOKEN must be set (the journey server's admin token)")
+        return 1
+    }
+    const dir = new URL("./journey/", import.meta.url)
+    const manifest = JSON.parse(readFileSync(new URL("journey.module.json", dir), "utf8"))
+    for (const schema of manifest.schemas ?? []) {
+        if (schema.schema || !schema.path) continue
+        const content = JSON.parse(readFileSync(new URL(schema.path, dir), "utf8"))
+        if (content.$id && content.$id !== schema.id) {
+            console.error(`❌ ${schema.path}: $id ${content.$id} does not match manifest id ${schema.id}`)
+            return 1
+        }
+        schema.schema = content
+    }
+
+    let res
+    try {
+        res = await fetch(new URL("/api/modules/register", journeyUrl), {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${setupToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(manifest),
+        })
+    } catch {
+        console.error(`❌ journey server unreachable at ${journeyUrl} (JOURNEY_URL or --url to override)`)
+        return 1
+    }
+    const body = await res.json().catch(() => null)
+    if (!res.ok) {
+        console.error(`❌ ${res.status}:`, body?.error ?? res.statusText)
+        return 1
+    }
+    const types = (body.schemas ?? []).map((s) => `${s.type} v${s.schemaVersion}`).join(", ")
+    console.log(`✅ registered ${body.id} ${body.version} (${types})${body.enabled ? "" : " · currently disabled"}`)
+    return 0
+}
+
 function usage() {
     console.log(`🦔 spike - spotify watchdog
 
@@ -184,12 +234,14 @@ commands:
   verify [--strict] [--deep]       consistency + integrity checks (exit 2 on drift)
   import-history --path <dir>      import a spotify gdpr extended streaming history
   journey-sync [--full]            push tracks, events and artwork to the journey server
+  journey-register [--url <base>]  register the music module (journey/) with the journey server
   hydrate                          backfill track metadata + album artwork
   stats                            totals, likes per month, top artists, listens by hour
   events [--month] [--kind] [--limit]
                                    inspect the event log
 
-env: SPIKE_URL (default http://127.0.0.1:8888)`)
+env: SPIKE_URL (default http://127.0.0.1:8888)
+     JOURNEY_URL, JOURNEY_SETUP_TOKEN (journey-register only)`)
     return 1
 }
 

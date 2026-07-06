@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.journey.local/types/music.library_event.v1.json",
+  "title": "music.library_event v1",
+  "description": "A music-library state change, such as saving a track or adding it to a playlist. Item IDs are deterministic: ULID time bits from the envelope ts, random bits from the first 80 bits of sha256('provider|event|ts|track.providerUri'), so re-observation and re-import are idempotent.",
+  "type": "object",
+  "required": ["event", "provider", "track"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Open-world event kind. Core vocabulary: saved, unsaved, playlist-added, playlist-removed."
+    },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Open-world provider slug, e.g. spotify, lastfm, apple-music, local."
+    },
+    "track": {
+      "type": "object",
+      "required": ["title", "artists"],
+      "description": "Snapshot of the track as observed. No item pointer is stored: the referenced music.track item's ID is derived from provider|providerUri.",
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "artists": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "providerUri": { "type": "string" }
+      }
+    },
+    "playlist": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "providerUri": { "type": "string" },
+        "purpose": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Open-world playlist purpose, e.g. monthly-liked, user, imported."
+        }
+      }
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When Journey observed the event. Envelope ts should be the provider's event time when known."
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "id": "journey.music",
+  "name": "Music",
+  "version": "0.1.0",
+  "description": "Provider-agnostic music listening history: tracks, listens, and library events produced by watcher clients such as journey-spotify-watcher.",
+  "kind": [
+    "domain"
+  ],
+  "runtime": {
+    "kind": "static"
+  },
+  "schemas": [
+    {
+      "type": "music.track",
+      "schemaVersion": "1",
+      "id": "https://schemas.journey.local/types/music.track.v1.json",
+      "path": "schemas/types/music.track.v1.schema.json",
+      "display": {
+        "title": "title",
+        "subtitle": "artists"
+      }
+    },
+    {
+      "type": "music.listen",
+      "schemaVersion": "1",
+      "id": "https://schemas.journey.local/types/music.listen.v1.json",
+      "path": "schemas/types/music.listen.v1.schema.json",
+      "display": {
+        "title": "track.title",
+        "subtitle": "track.artists"
+      }
+    },
+    {
+      "type": "music.library_event",
+      "schemaVersion": "1",
+      "id": "https://schemas.journey.local/types/music.library_event.v1.json",
+      "path": "schemas/types/music.library_event.v1.schema.json",
+      "display": {
+        "title": "track.title",
+        "subtitle": "event"
+      }
+    }
+  ],
+  "views": [
+    {
+      "surface": "timeline",
+      "slot": "item",
+      "kind": "renderer",
+      "id": "journey.music.timeline-card",
+      "title": "Music listen timeline card",
+      "itemTypes": [
+        "music.listen"
+      ],
+      "renderer": "music.timeline-card"
+    },
+    {
+      "surface": "table",
+      "slot": "columns",
+      "kind": "columns",
+      "id": "journey.music.table-columns",
+      "title": "Music columns",
+      "itemTypes": [
+        "music.listen",
+        "music.track",
+        "music.library_event"
+      ],
+      "renderer": "music.table-columns"
+    }
+  ]
+}

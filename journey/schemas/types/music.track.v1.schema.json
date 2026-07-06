@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.journey.local/types/music.track.v1.json",
+  "title": "music.track v1",
+  "description": "Cached metadata for a music track seen through a provider. Item IDs are deterministic: random bits from the first 80 bits of sha256('provider|providerUri') for the first provider seen, so watchers upsert instead of duplicating. Payloads carry only stable metadata - volatile provider fields (popularity, available_markets, preview_url, is_playable, restrictions) are excluded, and watchers upsert only when a stable field changed. Album art must be downloaded into a blob (attachment role 'artwork'); previewImage.url is provenance only and will rot.",
+  "type": "object",
+  "required": ["title", "artists"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "artists": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "providerIds": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    },
+    "album": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "releaseDate": {
+          "type": "string",
+          "description": "Verbatim provider string; the format is self-describing precision ('1981', '1981-12', '1981-12-04')."
+        },
+        "albumType": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "e.g. album, single, compilation."
+        },
+        "totalTracks": { "type": "integer", "minimum": 0 },
+        "providerIds": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "explicit": { "type": "boolean" },
+    "trackNumber": { "type": "integer", "minimum": 0 },
+    "discNumber": { "type": "integer", "minimum": 0 },
+    "isrc": { "type": "string" },
+    "providerIds": {
+      "type": "object",
+      "description": "Provider-specific IDs or URIs, e.g. spotify: 'spotify:track:...'.",
+      "additionalProperties": { "type": "string" }
+    },
+    "previewImage": {
+      "type": "object",
+      "description": "Provenance record of the provider's artwork URL. The durable copy is the 'artwork' attachment blob.",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

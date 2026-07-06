@@ -161,6 +161,14 @@ remains for backfilling an existing database.
 
 ### Journey sync
 
+spike owns the `journey.music` module (`journey/` - manifest + schemas for
+`music.track`, `music.listen`, `music.library_event`). register it once per
+server with `JOURNEY_SETUP_TOKEN=<admin token> bun cli.js journey-register`;
+re-run after schema changes (it upserts, and the server refuses upgrades that
+would orphan a schema version still used by stored items). pushes before
+registration come back as retryable `unknown_schema` rejections and drain on
+the next sync.
+
 with `JOURNEY_URL`, `JOURNEY_TOKEN`, and `JOURNEY_CLIENT_ID` configured (a
 journey client with `write:music.*` scope), `journey-sync` pushes everything
 to a [journey server](../24w03-heros-path) as provider-agnostic items over
