@@ -17,6 +17,12 @@ import { closeDb } from "./src/db/init.js"
 
 const PORT = Number(process.env.PORT) || 8888
 const app = express()
+const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🦔</text></svg>`
+
+app.get(["/favicon.ico", "/favicon.svg"], (req, res) => {
+    res.set("Cache-Control", "public, max-age=86400")
+    res.type("image/svg+xml").send(FAVICON)
+})
 
 app.use("/", Auth.router)
 

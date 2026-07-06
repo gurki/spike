@@ -1,5 +1,6 @@
 import { getDb } from "./db/init.js"
 import { getSyncState } from "./eventstore.js"
+import { artworkPath } from "./hydrate.js"
 
 export function getStats() {
     const db = getDb()
@@ -96,7 +97,8 @@ export function getPlaylists() {
 }
 
 export function getArtwork(sha256) {
-    return getDb().prepare("SELECT path, content_type FROM artwork WHERE sha256 = ?").get(sha256) ?? null
+    const artwork = getDb().prepare("SELECT content_type FROM artwork WHERE sha256 = ?").get(sha256)
+    return artwork ? { ...artwork, path: artworkPath(sha256) } : null
 }
 
 export function getEvents({ month = null, kind = null, q = null, limit = 50, offset = 0 } = {}) {

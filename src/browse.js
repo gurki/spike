@@ -9,50 +9,78 @@ export const BROWSE_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>spike 🦔</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
-    :root { color-scheme: dark; }
+    :root {
+        color-scheme: dark;
+        --bg: #121212;
+        --panel: #171717;
+        --surface: #1b1b1b;
+        --surface-2: #202020;
+        --line: #2c2c2c;
+        --line-strong: #3a3a3a;
+        --text: #ececec;
+        --muted: #9a9a9a;
+        --dim: #686868;
+        --accent: #2e5c3f;
+        --accent-hot: #4eb36f;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #121212; color: #eee; font: 14px/1.4 -apple-system, system-ui, sans-serif; }
-    header { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-             padding: 14px 20px; background: #121212ee; backdrop-filter: blur(4px); }
-    h1 { font-size: 16px; margin: 0; }
-    input, select { padding: 7px 12px; border-radius: 18px; border: 1px solid #333;
-                    background: #1e1e1e; color: #eee; outline: none; }
-    input { flex: 1; max-width: 360px; }
-    .toggle { display: flex; border: 1px solid #333; border-radius: 18px; overflow: hidden; }
-    .toggle button { padding: 7px 12px; border: 0; background: #1e1e1e; color: #999; cursor: pointer; }
-    .toggle button.on { background: #2e5c3f; color: #eee; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, system-ui, sans-serif; }
+    header { position: sticky; top: 0; z-index: 5; display: flex; gap: 14px; align-items: center;
+             flex-wrap: wrap; padding: 12px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    h1 { font-size: 17px; line-height: 1; margin: 0; font-weight: 650; }
+    input, select { min-height: 36px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+                    background: var(--surface); color: var(--text); outline: none; font: inherit; }
+    input { flex: 1 1 280px; min-width: 160px; max-width: 520px; }
+    input:focus, select:focus { border-color: var(--line-strong); box-shadow: 0 0 0 2px rgba(78, 179, 111, 0.16); }
+    .toggle { display: flex; gap: 4px; align-items: center; }
+    .toggle button { min-height: 36px; padding: 6px 12px; border: 0; border-radius: 8px; background: transparent;
+                     color: var(--muted); cursor: pointer; font: inherit; font-weight: 600; }
+    .toggle button:hover { background: var(--surface-2); color: var(--text); }
+    .toggle button.on { background: var(--accent); color: #fff; }
     [hidden] { display: none !important; }
-    #count { color: #888; font-size: 12px; margin-left: auto; }
+    #count { color: var(--muted); font-size: 13px; margin-left: auto; white-space: nowrap; }
 
     /* Library: cover grid */
     main.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-                gap: 16px; padding: 8px 20px 40px; }
-    .card { display: block; color: inherit; text-decoration: none; }
-    .card[href]:hover img, .card[href]:hover .noart { outline: 2px solid #2e5c3f; }
-    .card img, .card .noart { width: 100%; aspect-ratio: 1; border-radius: 6px;
-           background: #1e1e1e; object-fit: cover; display: block; }
-    .noart { display: grid; place-items: center; color: #444; font-size: 32px; }
-    .t { margin-top: 6px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .a, .m { color: #999; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .m { color: #666; }
+                gap: 16px; padding: 18px; }
+    .card { display: block; min-width: 0; color: inherit; text-decoration: none; background: var(--surface);
+            border: 1px solid var(--line); border-radius: 8px; overflow: hidden; transition: border-color 120ms ease, background 120ms ease; }
+    .card[href]:hover { border-color: var(--accent); background: var(--surface-2); }
+    .card img, .card .noart { width: 100%; aspect-ratio: 1; background: var(--surface-2); object-fit: cover; display: block; }
+    .noart { display: grid; place-items: center; color: #505050; font-size: 34px; }
+    .card .b { padding: 9px 10px 10px; }
+    .t { font-size: 13px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .a, .m { color: var(--muted); font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .a { margin-top: 3px; }
+    .m { color: var(--dim); }
 
     /* History: linear day-grouped timeline */
-    main.timeline { max-width: 640px; margin: 0 auto; padding: 8px 16px 60px; }
-    .day { position: sticky; top: 56px; padding: 12px 6px 6px; font-size: 12px; font-weight: 600;
-           color: #9b9b9b; background: #121212ee; backdrop-filter: blur(4px); }
-    .row { display: flex; align-items: center; gap: 12px; padding: 7px 6px; border-radius: 8px;
+    main.timeline { max-width: 720px; margin: 0 auto; padding: 18px 16px 60px; }
+    .day { position: sticky; top: 61px; padding: 13px 4px 7px; font-size: 12px; font-weight: 700;
+           color: #c8c8c8; background: var(--bg); }
+    .row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px;
            color: inherit; text-decoration: none; }
-    .row:hover { background: #1c1c1c; }
+    .row:hover { background: var(--surface); }
     .row .thumb, .row .noart { width: 44px; height: 44px; border-radius: 4px; flex: 0 0 44px;
-           background: #1e1e1e; object-fit: cover; }
-    .row .noart { display: grid; place-items: center; color: #444; }
+           background: var(--surface-2); object-fit: cover; }
+    .row .noart { display: grid; place-items: center; color: #505050; }
     .row .meta { min-width: 0; flex: 1; }
     .row .rt { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row .ra { color: #999; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row .time { color: #888; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    #more { display: block; margin: 20px auto; padding: 8px 18px; border-radius: 18px;
-            border: 1px solid #333; background: #1e1e1e; color: #eee; cursor: pointer; }
+    .row .ra { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #more { display: block; margin: 20px auto; padding: 8px 18px; border-radius: 8px;
+            border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
+    #more:hover { background: var(--surface-2); border-color: var(--line-strong); }
+
+    @media (max-width: 620px) {
+        header { gap: 10px; padding: 10px 12px; }
+        h1 { flex-basis: 100%; }
+        input { order: 4; flex-basis: 100%; max-width: none; }
+        #count { margin-left: 0; }
+        main.grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); padding: 12px; gap: 12px; }
+    }
 </style>
 </head>
 <body>
@@ -146,10 +174,10 @@ export const BROWSE_HTML = `<!doctype html>
             const saved = t.saved_at ? t.saved_at.slice(0, 10) : "–"
             const heard = t.listen_count ? " · ♫ " + t.listen_count : ""
             return '<a class="card"' + openAttr(t.uri) + '>' + art +
-                '<div class="t">' + esc(t.title ?? t.uri) + '</div>' +
+                '<div class="b"><div class="t">' + esc(t.title ?? t.uri) + '</div>' +
                 '<div class="a">' + esc(artists) + '</div>' +
                 '<div class="m">' + esc(t.album_name ?? "") + '</div>' +
-                '<div class="m">' + (mode === "playlist" && month ? "▶ " : "❤ ") + saved + heard + '</div></a>'
+                '<div class="m">' + (mode === "playlist" && month ? "▶ " : "❤ ") + saved + heard + '</div></div></a>'
         }).join("")
     }
 
