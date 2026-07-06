@@ -15,7 +15,7 @@ App Description: watchdog for likes ❤️ and track history ⏳
 Redirect URI:    http://127.0.0.1:8888/callback
 ```
 
-copy `/backend/.env.example` to `/backend/.env` and add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization).
+copy `.env.example` to `.env` and add your [client credentials](https://developer.spotify.com/documentation/web-api/concepts/authorization).
 
 ```env
 PORT=8888
@@ -30,12 +30,11 @@ HISTORY_INTERVAL_S=60
 ## Run (Docker, recommended for the server)
 
 ```sh
-cd backend
 docker compose up -d --build
 ```
 
-the `backend/db` directory (sqlite database, artwork, auth tokens) is
-bind-mounted and persists across rebuilds. deploying an update is
+the `db` directory (sqlite database, artwork, auth tokens) is bind-mounted
+and persists across rebuilds. deploying an update is
 `git pull && docker compose up -d --build`.
 
 ## Run (bare metal)
@@ -43,7 +42,6 @@ bind-mounted and persists across rebuilds. deploying an update is
 executed with [bun](https://bun.sh); the code itself uses standard node APIs.
 
 ```sh
-cd backend
 bun install
 bun index.js        # or: bun --watch index.js for development
 ```
@@ -53,7 +51,7 @@ a systemd unit for running without docker is in `deploy/spike.service`.
 ## Authorization
 
 log in once at http://127.0.0.1:8888/login. tokens are stored in
-`backend/db/auth.json` and refreshed automatically.
+`db/auth.json` and refreshed automatically.
 
 ## Commands
 
@@ -119,16 +117,11 @@ rebuilding the database from scratch never creates duplicates:
 every event also stores a **local timestamp + timezone** alongside the
 verbatim utc `triggered_at`. spotify reports only utc, so local time is
 derived from the home zone (`SPIKE_TZ`, default `Europe/Berlin`) at record
-time - sqlite can't do IANA/DST math, so it's precomputed like `month`. this
-makes time-of-day queries possible:
+time - sqlite can't do IANA/DST math, so it's precomputed like `month`.
 
 ```sh
-bun cli.js events --kind listen --part morning   # morning|afternoon|evening|night
 bun cli.js stats                                  # includes a listens-by-hour histogram
 ```
-
-part-of-day bands: morning 05-11, afternoon 12-16, evening 17-21, night
-22-04 (local).
 
 ### Rebuild from the source of truth
 
@@ -202,7 +195,7 @@ journey server.
 
 ## Endpoints
 
-- `GET /browse` - open in a browser: a **Library** cover grid of all tracks, and a **History** view — a day-grouped listen timeline (search + part-of-day filter, newest first)
+- `GET /browse` - open in a browser: a **Library** cover grid of all tracks, and a **History** view — a day-grouped listen timeline (search, newest first)
 - `GET /healthz` - liveness
 - `GET /stats` - totals, likes per month, top artists, last sync times
 - `GET /events?month=&kind=&limit=` - event log
@@ -215,7 +208,7 @@ journey server.
 
 ## Storage
 
-everything lives in `backend/db`:
+everything lives in `db`:
 
 - `spike.db` - sqlite database (tracks, events, playlist cache, sync state)
 - `artwork/` - content-addressed album covers

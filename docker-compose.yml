@@ -7,7 +7,7 @@ services:
     ports:
       - "${PORT:-8888}:${PORT:-8888}"
     volumes:
-      - ./db:/usr/src/backend/db
+      - ./db:/usr/src/spike/db
     healthcheck:
       test: ["CMD", "bun", "-e", "await fetch('http://127.0.0.1:' + (process.env.PORT || 8888) + '/healthz').then(r => { if (!r.ok) throw 1 })"]
       interval: 60s

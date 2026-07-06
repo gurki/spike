@@ -186,7 +186,7 @@ commands:
   journey-sync [--full]            push tracks, events and artwork to the journey server
   hydrate                          backfill track metadata + album artwork
   stats                            totals, likes per month, top artists, listens by hour
-  events [--month] [--kind] [--part morning|afternoon|evening|night] [--limit]
+  events [--month] [--kind] [--limit]
                                    inspect the event log
 
 env: SPIKE_URL (default http://127.0.0.1:8888)`)

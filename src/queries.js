@@ -1,23 +1,6 @@
 import { getDb } from "./db/init.js"
 import { getSyncState } from "./eventstore.js"
 
-// Part-of-day bands over the local hour (night wraps midnight).
-const PART_HOURS = {
-    morning: [5, 11],
-    afternoon: [12, 16],
-    evening: [17, 21],
-    night: [22, 4],
-}
-
-// SQL predicate on the local hour for a part-of-day; null if part is unknown.
-function partClause(part) {
-    const band = PART_HOURS[part]
-    if (!band) return null
-    const [from, to] = band
-    const hour = "CAST(substr(e.local_time, 12, 2) AS INTEGER)"
-    return from <= to ? `${hour} BETWEEN ${from} AND ${to}` : `(${hour} >= ${from} OR ${hour} <= ${to})`
-}
-
 export function getStats() {
     const db = getDb()
 
@@ -43,7 +26,7 @@ export function getStats() {
         GROUP BY je.value ORDER BY likes DESC LIMIT 20
     `).all()
 
-    // 24-bucket histogram of listens by local hour (for "morning listening")
+    // 24-bucket histogram of listens by local hour.
     const rows = db.prepare(`
         SELECT CAST(substr(local_time, 12, 2) AS INTEGER) AS hour, COUNT(*) AS n
         FROM events WHERE kind = 'listen' AND local_time IS NOT NULL
@@ -116,8 +99,7 @@ export function getArtwork(sha256) {
     return getDb().prepare("SELECT path, content_type FROM artwork WHERE sha256 = ?").get(sha256) ?? null
 }
 
-export function getEvents({ month = null, kind = null, part = null, q = null, limit = 50, offset = 0 } = {}) {
-    const part_sql = part ? partClause(part) : null
+export function getEvents({ month = null, kind = null, q = null, limit = 50, offset = 0 } = {}) {
     const like = q ? `%${q}%` : null
     const events = getDb().prepare(`
         SELECT e.id, e.kind, e.triggered_at, e.local_time, e.tz, e.month,
@@ -128,7 +110,6 @@ export function getEvents({ month = null, kind = null, part = null, q = null, li
         WHERE (@kind IS NULL OR e.kind = @kind)
           AND (@month IS NULL OR e.month = @month)
           AND (@like IS NULL OR t.title LIKE @like OR t.artists LIKE @like)
-          ${part_sql ? `AND ${part_sql}` : ""}
         ORDER BY e.triggered_at DESC
         LIMIT @limit OFFSET @offset
     `).all({ month, kind, like, limit: Number(limit) || 50, offset: Number(offset) || 0 })

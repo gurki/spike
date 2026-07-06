@@ -64,13 +64,6 @@ export const BROWSE_HTML = `<!doctype html>
     </span>
     <input id="q" type="search" placeholder="search title, artist ...">
     <select id="month"><option value="">all months</option></select>
-    <select id="part" hidden>
-        <option value="">all day</option>
-        <option value="morning">morning</option>
-        <option value="afternoon">afternoon</option>
-        <option value="evening">evening</option>
-        <option value="night">night</option>
-    </select>
     <span class="toggle" id="lens" hidden>
         <button id="lensLiked" class="on" title="tracks liked this month">❤ liked</button>
         <button id="lensPlaylist" title="cached contents of the monthly playlist">▶ playlist</button>
@@ -83,7 +76,6 @@ export const BROWSE_HTML = `<!doctype html>
     const count = document.getElementById("count")
     const input = document.getElementById("q")
     const monthSel = document.getElementById("month")
-    const partSel = document.getElementById("part")
     const lens = document.getElementById("lens")
     const lensLiked = document.getElementById("lensLiked")
     const lensPlaylist = document.getElementById("lensPlaylist")
@@ -125,7 +117,6 @@ export const BROWSE_HTML = `<!doctype html>
         view = next
         viewLibrary.classList.toggle("on", view === "library")
         viewHistory.classList.toggle("on", view === "history")
-        partSel.hidden = view !== "history"
         input.placeholder = view === "history" ? "search title, artist ..." : "search title, artist, album ..."
         load()
     }
@@ -179,7 +170,6 @@ export const BROWSE_HTML = `<!doctype html>
         const q = input.value.trim()
         if (q) params.set("q", q)
         if (monthSel.value) params.set("month", monthSel.value)
-        if (partSel.value) params.set("part", partSel.value)
         return params
     }
 
@@ -227,7 +217,6 @@ export const BROWSE_HTML = `<!doctype html>
 
     input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(load, 250) })
     monthSel.addEventListener("change", load)
-    partSel.addEventListener("change", load)
     lensLiked.addEventListener("click", () => setMode("liked"))
     lensPlaylist.addEventListener("click", () => setMode("playlist"))
     viewLibrary.addEventListener("click", () => setView("library"))

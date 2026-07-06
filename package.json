@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "bun --watch index.js",
     "start": "bun index.js",
-    "test": "node --test test/"
+    "test": "bun test"
   },
   "dependencies": {
     "better-sqlite3": "^12.0.0",

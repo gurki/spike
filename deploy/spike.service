@@ -9,11 +9,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/srv/spike/backend
+WorkingDirectory=/srv/spike
 ExecStart=/usr/local/bin/bun index.js
 Restart=on-failure
 RestartSec=5
-EnvironmentFile=/srv/spike/backend/.env
+EnvironmentFile=/srv/spike/.env
 
 [Install]
 WantedBy=multi-user.target

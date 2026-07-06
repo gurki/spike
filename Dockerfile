@@ -1,5 +1,5 @@
 FROM oven/bun:1-slim
-WORKDIR /usr/src/backend
+WORKDIR /usr/src/spike
 
 COPY package.json bun.lock* ./
 RUN bun install --production
