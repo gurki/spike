@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 
 import { getDb } from "./db/init.js"
 import { getSyncState, setSyncState } from "./eventstore.js"
+import { artworkPath } from "./hydrate.js"
 import { entityUlid } from "./ids.js"
 
 // Push spike's canonical data to a journey server as music.* items over the
@@ -160,7 +161,10 @@ async function uploadBlob(cfg, artwork, result) {
     const head = await api(cfg, "HEAD", `/api/blobs/sha256:${artwork.sha256}`)
     if (head.status === 200) { result.blobsSkipped++; return }
 
-    const bytes = readFileSync(artwork.path)
+    // Derive the path from the hash instead of trusting the stored absolute
+    // path: the content-addressed layout is the contract, so the database
+    // stays portable across machines.
+    const bytes = readFileSync(artworkPath(artwork.sha256))
     const res = await api(cfg, "PUT", `/api/blobs/sha256:${artwork.sha256}`, bytes, {
         "Content-Type": artwork.content_type ?? "application/octet-stream",
     })
