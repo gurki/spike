@@ -169,10 +169,14 @@ would orphan a schema version still used by stored items). pushes before
 registration come back as retryable `unknown_schema` rejections and drain on
 the next sync.
 
-with `JOURNEY_URL`, `JOURNEY_TOKEN`, and `JOURNEY_CLIENT_ID` configured (a
-journey client with `write:music.*` scope), `journey-sync` pushes everything
-to a [journey server](../24w03-heros-path) as provider-agnostic items over
-its normal sync api:
+Journey is opt-in. Run `journey-sync` manually when `JOURNEY_URL`,
+`JOURNEY_TOKEN`, and `JOURNEY_CLIENT_ID` are configured (a journey client with
+`write:music.*` scope), or set `JOURNEY_ENABLED=true` to let the daemon push
+automatically after watcher activity. Without `JOURNEY_ENABLED=true`, spike
+continues to hydrate artwork and run locally without contacting Journey.
+
+`journey-sync` pushes everything to a [journey server](../24w03-heros-path) as
+provider-agnostic items over its normal sync api:
 
 - tracks become `music.track` items (deterministic ids from the provider
   uri), with album artwork uploaded as content-addressed blobs and attached
@@ -188,9 +192,9 @@ and **re-push when their metadata or artwork is filled in later**, so a track
 never lands on the archive permanently art-less. the daemon hydrates before
 pushing, so tracks normally arrive with artwork on the first push. the whole
 thing is idempotent (`--full` re-pushes everything; the server absorbs
-duplicates) and automatic: any new listen, like, or playlist add triggers a
-debounced hydrate-then-push ~10s later, and failures retry on the next change
-since neither the cursor nor the dirty marks advance on error. spike stays
+duplicates). With `JOURNEY_ENABLED=true`, any new listen, like, or playlist add
+triggers a debounced hydrate-then-push ~10s later, and failures retry on the next
+change since neither the cursor nor the dirty marks advance on error. spike stays
 the source of its own working state; journey is the archive.
 
 ### Artwork

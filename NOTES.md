@@ -9,7 +9,7 @@
 ## Resolved
 - **playlist renames / stale entries** no longer cause wrong-playlist adds: reconcile compares desired state (liked songs by month) against the *actual* playlist contents (snapshot-cached, refetched when spotify's `snapshot_id` changes), so the db never drifts from reality.
 - **removed / unliked songs**: additive-only reconcile keeps them (never silently removed; `--prune` opts into exact matching).
-- **watchers = trigger + action**: events drive reconcile, hydrate, and journey sync.
+- **watchers = trigger + action**: events drive reconcile, hydrate, and optional journey sync.
 - **endpoints to view state / history frontend**: `/browse`, `/stats`, `/events`, `/tracks` on the daemon.
 
 ## Ideas
